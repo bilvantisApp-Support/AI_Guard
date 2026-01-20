@@ -57,9 +57,9 @@ export class ProjectsController {
         return;
       }
       const userId = ctx.state.auth.user._id;
-      
+
       const projects = await projectRepository.findByMember(userId);
-      
+
       ctx.body = {
         projects: projects.map(project => ({
           id: project._id,
@@ -94,7 +94,7 @@ export class ProjectsController {
       const userId = ctx.state.auth.user._id;
 
       const project = await projectRepository.findById(projectId);
-      
+
       if (!project) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
@@ -106,16 +106,39 @@ export class ProjectsController {
       }
 
       const userRole = await projectRepository.getMemberRole(projectId, userId);
-      
+
       ctx.body = {
         id: project._id,
         name: project.name,
         ownerId: project.ownerId,
-        members: project.members.map(member => ({
-          userId: member.userId,
-          role: member.role,
-          addedAt: member.addedAt,
-        })),
+        members: project.members.map(member => {
+          let userId, name, email;
+          if (
+            typeof member.userId === 'object' &&
+            member.userId !== null &&
+            'name' in member.userId &&
+            'email' in member.userId
+          ) {
+            // Populated user
+            userId = (member.userId as any)._id;
+            name = (member.userId as any).name;
+            email = (member.userId as any).email;
+          } else {
+            // Not populated, only ObjectId
+            userId = member.userId;
+            name = undefined;
+            email = undefined;
+          }
+
+          return {
+            userId,
+            name,
+            email,
+            role: member.role,
+            addedAt: member.addedAt,
+          };
+        }),
+
         settings: project.settings,
         usage: project.usage,
         userRole,
@@ -158,7 +181,7 @@ export class ProjectsController {
       }
 
       const updatedProject = await projectRepository.updateProject(projectId, updateData);
-      
+
       if (!updatedProject) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
@@ -190,7 +213,7 @@ export class ProjectsController {
       const userId = ctx.state.auth.user._id;
 
       const project = await projectRepository.findById(projectId);
-      
+
       if (!project) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
@@ -201,7 +224,7 @@ export class ProjectsController {
       }
 
       await projectRepository.deleteProject(projectId);
-      
+
       ctx.body = {
         message: 'Project deleted successfully',
         projectId,
@@ -292,7 +315,7 @@ export class ProjectsController {
       }
 
       const project = await projectRepository.findById(projectId);
-      
+
       if (!project) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
@@ -349,7 +372,7 @@ export class ProjectsController {
       }
 
       const updatedProject = await projectRepository.removeApiKey(projectId, keyId);
-      
+
       if (!updatedProject) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project or API key not found');
       }
@@ -390,7 +413,7 @@ export class ProjectsController {
       const end = endDate ? new Date(endDate as string) : new Date();
 
       const stats = await usageTracker.getProjectUsageStats(projectId, start, end);
-      
+
       ctx.body = {
         projectId,
         period: { start, end },
@@ -423,13 +446,13 @@ export class ProjectsController {
       }
 
       const project = await projectRepository.findById(projectId);
-      
+
       if (!project) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
 
       const quotaStatus = await quotaChecker.checkQuota(project);
-      
+
       ctx.body = {
         projectId,
         ...quotaStatus,
@@ -534,7 +557,7 @@ export class ProjectsController {
       }
 
       const updatedProject = await projectRepository.removeMember(projectId, memberId);
-      
+
       if (!updatedProject) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project or member not found');
       }

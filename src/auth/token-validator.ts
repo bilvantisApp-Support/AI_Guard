@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { firebaseAdmin } from './firebase-admin';
 import { tokenRepository } from '../database/repositories/token.repository';
 import { IUser } from '../database/models/user.model';

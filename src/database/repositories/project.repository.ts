@@ -40,6 +40,7 @@ export class ProjectRepository {
       ...projectData,
       members: [{
         userId: projectData.ownerId,
+        
         role: 'owner',
         addedAt: new Date(),
       }],
@@ -48,7 +49,11 @@ export class ProjectRepository {
   }
 
   async findById(projectId: string | mongoose.Types.ObjectId): Promise<IProject | null> {
-    return await Project.findById(projectId).exec();
+    return await Project.findById(projectId).populate({
+      path: 'members.userId',
+      select: 'name email',
+    }
+    ).exec();
   }
 
   async findByOwner(ownerId: string | mongoose.Types.ObjectId): Promise<IProject[]> {
