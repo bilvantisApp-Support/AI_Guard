@@ -7,6 +7,7 @@ import { usageTracker } from '../../interceptors/response/usage-tracker';
 import { quotaChecker } from '../../interceptors/request/quota-checker';
 import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
+import mongoose from 'mongoose';
 
 export class ProjectsController {
   /**
@@ -21,7 +22,7 @@ export class ProjectsController {
         return;
       }
       const userId = ctx.state.auth.user._id;
-      const { name } = ctx.request.body as any;
+      const { name,description } = ctx.request.body as any;
 
       if (!name || !name.trim()) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project name is required');
@@ -29,6 +30,7 @@ export class ProjectsController {
 
       const project = await projectRepository.createProject({
         name: name.trim(),
+        description,
         ownerId: userId,
       });
 
@@ -93,7 +95,7 @@ export class ProjectsController {
       }
       const userId = ctx.state.auth.user._id;
 
-      const project = await projectRepository.findById(projectId);
+      const project = await projectRepository.findByIdWithMembers(projectId);
 
       if (!project) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
@@ -110,6 +112,7 @@ export class ProjectsController {
       ctx.body = {
         id: project._id,
         name: project.name,
+        description: project.description,
         ownerId: project.ownerId,
         members: project.members.map(member => {
           let userId, name, email;
@@ -119,12 +122,10 @@ export class ProjectsController {
             'name' in member.userId &&
             'email' in member.userId
           ) {
-            // Populated user
-            userId = (member.userId as any)._id;
-            name = (member.userId as any).name;
-            email = (member.userId as any).email;
+            userId = member.userId._id as mongoose.Types.ObjectId;
+            name = member.userId.name as string;
+            email = member.userId.email as string;
           } else {
-            // Not populated, only ObjectId
             userId = member.userId;
             name = undefined;
             email = undefined;

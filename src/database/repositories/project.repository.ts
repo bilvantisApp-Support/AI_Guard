@@ -3,6 +3,7 @@ import { Project, IProject, IProviderApiKey, IProjectMember, IUsageMetrics } fro
 
 export interface CreateProjectDto {
   name: string;
+  description?: string;
   ownerId: mongoose.Types.ObjectId;
 }
 
@@ -40,7 +41,6 @@ export class ProjectRepository {
       ...projectData,
       members: [{
         userId: projectData.ownerId,
-        
         role: 'owner',
         addedAt: new Date(),
       }],
@@ -49,12 +49,16 @@ export class ProjectRepository {
   }
 
   async findById(projectId: string | mongoose.Types.ObjectId): Promise<IProject | null> {
+    return await Project.findById(projectId).exec();
+  }
+  
+  async findByIdWithMembers(projectId: String | mongoose.Types.ObjectId): Promise<IProject | null> {
     return await Project.findById(projectId).populate({
       path: 'members.userId',
-      select: 'name email',
-    }
-    ).exec();
+      select: 'name email'
+    }).exec();
   }
+
 
   async findByOwner(ownerId: string | mongoose.Types.ObjectId): Promise<IProject[]> {
     return await Project.find({ ownerId }).exec();
