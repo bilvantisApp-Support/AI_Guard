@@ -131,7 +131,7 @@ export class UsersController {
         return;
       }
       const userId = ctx.state.auth.user._id.toString();
-      const { name, scopes, projectId, expiresInDays } = ctx.request.body as any;
+      const { name, scopes, llmProvider, projectId, expiresInDays } = ctx.request.body as any;
 
       // Validate required fields
       if (!name) {
@@ -140,6 +140,10 @@ export class UsersController {
 
       if (!scopes || !Array.isArray(scopes) || scopes.length === 0) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'At least one scope is required');
+      }
+
+      if (!llmProvider || typeof llmProvider !== 'string') {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'LLM provider is required');
       }
 
       // Validate scopes
@@ -159,6 +163,7 @@ export class UsersController {
         projectId,
         name,
         scopes,
+        llmProvider,
         expiresInDays,
       });
 
@@ -167,6 +172,7 @@ export class UsersController {
         name: tokenRecord.name,
         token, // Only returned once during creation
         scopes: tokenRecord.scopes,
+        llmProvider: tokenRecord.llmProvider,
         projectId: tokenRecord.projectId,
         expiresAt: tokenRecord.expiresAt,
         createdAt: tokenRecord.createdAt,

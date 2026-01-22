@@ -46,6 +46,7 @@ export class PatMiddleware {
         userId: authResult.user._id,
         tokenId: authResult.token?._id,
         scopes: tokenScopes,
+        llmProvider: authResult.token?.llmProvider,
         requiredScopes,
         path: ctx.path,
         method: ctx.method,

@@ -1,7 +1,7 @@
 import { TokenValidator } from '../../../src/auth/token-validator';
 import bcrypt from 'bcryptjs';
 
-jest.mock('../../src/database/repositories/token.repository', () => ({
+jest.mock('../../../src/database/repositories/token.repository', () => ({
   tokenRepository: {
     findByIdentifierWithUser: jest.fn(),
     updateLastUsed: jest.fn(),

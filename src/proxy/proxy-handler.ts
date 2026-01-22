@@ -7,6 +7,7 @@ import { getProviderConfig } from './provider-config';
 import { Readable } from 'stream';
 import { ApiKeyResolver } from './api-key-resolver';
 import { AuthState } from '../auth/auth-middleware';
+import { projectRepository } from '../database/repositories';
 
 export class ProxyHandler {
   private httpClient: HttpClient;
@@ -59,7 +60,13 @@ export class ProxyHandler {
       // Get authenticated user and project from context
       const authState = ctx.state.auth as AuthState | undefined;
       const user = authState?.user;
-      const project = authState?.project;
+      const token = authState?.token;
+
+      let project = authState?.project;
+
+      if (!project && token?.projectId) {
+        project = await projectRepository.findById(token.projectId);
+      }
 
       // Check if provider is allowed for the project
       if (project && !ApiKeyResolver.isProviderAllowed(project, providerConfig.name)) {
@@ -68,6 +75,24 @@ export class ProxyHandler {
           403,
           `Provider ${providerName} is not allowed for this project`,
         );
+      }
+
+      //Check that token must bound to correct llmProvider and project
+      if (!token?.projectId || !token?.llmProvider) {
+        throw new ProxyError(
+          ProxyErrorType.CONFIGURATION_ERROR,
+          503,
+          `Token is missing required fields`,
+        )
+      }
+
+      // Check that token is valid for the requested provider
+      if (token.llmProvider !== providerConfig.name) {
+        throw new ProxyError(
+          ProxyErrorType.INVALID_REQUEST,
+          403,
+          `Token is not valid for provider ${providerName}`,
+        )
       }
 
       // Resolve API key dynamically

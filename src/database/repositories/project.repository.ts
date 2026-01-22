@@ -91,7 +91,10 @@ export class ProjectRepository {
 
     return await Project.findByIdAndUpdate(
       projectId,
-      { $push: { apiKeys: apiKey } },
+      {
+        $push: { apiKeys: apiKey },
+        $addToSet: { 'settings.allowedProviders': apiKey.provider }
+      },
       { new: true }
     ).exec();
   }
