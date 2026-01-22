@@ -1,4 +1,4 @@
-import { HashingService } from '../../src/security/hashing';
+import { HashingService } from '../../../src/security/hashing';
 
 describe('HashingService', () => {
 

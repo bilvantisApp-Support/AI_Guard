@@ -1,4 +1,4 @@
-import { TokenValidator } from '../../src/auth/token-validator';
+import { TokenValidator } from '../../../src/auth/token-validator';
 import bcrypt from 'bcryptjs';
 
 jest.mock('../../src/database/repositories/token.repository', () => ({
@@ -14,7 +14,7 @@ jest.mock('../../src/auth/firebase-admin', () => ({
   },
 }));
 
-import { tokenRepository } from '../../src/database/repositories/token.repository';
+import { tokenRepository } from '../../../src/database/repositories/token.repository';
 
 describe('TokenValidator - PAT', () => {
 

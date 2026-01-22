@@ -27,6 +27,9 @@ export class ProjectsController {
       if (!name || !name.trim()) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project name is required');
       }
+      if (!description) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project description is required');
+      }
 
       const project = await projectRepository.createProject({
         name: name.trim(),
