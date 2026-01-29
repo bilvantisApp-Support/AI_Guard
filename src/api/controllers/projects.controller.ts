@@ -530,6 +530,90 @@ export class ProjectsController {
   }
 
   /**
+   * Update member from project
+   * PUT /_api/projects/:id/members/:memberId
+   */
+
+  static async updateMemberRole(ctx: Context): Promise<void> {
+    try {
+      const projectId = ctx.params.id;
+      const memberId = ctx.params.memberId;
+      const { role } = ctx.request.body as { role: 'admin' | 'member' }
+
+      if (!ctx.state.auth) {
+        ctx.status = 401;
+        ctx.body = { error: 'Authentication required' };
+        return;
+      }
+
+      const userId = ctx.state.auth.user._id;
+
+      //Check valid roles
+      if (!role || !['admin', 'member'].includes(role)) {
+        throw new ProxyError(
+          ProxyErrorType.INVALID_REQUEST,
+          400,
+          'Invalid role'
+        );
+      }
+
+      // Check permissions
+      const userRole = await projectRepository.getMemberRole(projectId, userId);
+      if (!userRole || !['owner', 'admin'].includes(userRole)) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 403, 'Insufficient permissions');
+      }
+
+      //Check project exist
+      const project = await projectRepository.findById(projectId);
+      if (!project) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
+      }
+
+      //Check member exist
+      const selectedMember = project.members.find(
+        (m) => m.userId == memberId
+      );
+      if (!selectedMember) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'selected member not found');
+      }
+
+      //Owner role cannot be changed
+      if (selectedMember.role == 'owner') {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Cannot change owner role');
+      }
+
+      //Prevent to change same role
+      if (selectedMember.role == role) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Member already has this role');
+      }
+
+      // Update role
+      const updatedProject = await projectRepository.updateMemberRole(
+        projectId,
+        memberId,
+        role
+      );
+
+      if (!updatedProject) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project or member not found');
+      }
+
+      ctx.body = {
+        message: 'Member role updated successfully',
+        member: {
+          userId: memberId,
+          role,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+
+    } catch (error) {
+      logger.error('Failed to update member role:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Remove member from project
    * DELETE /_api/projects/:id/members/:memberId
    */

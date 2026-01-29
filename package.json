@@ -40,6 +40,7 @@
     "koa-ratelimit": "^6.0.0",
     "mongoose": "^8.16.4",
     "node-cache": "^5.1.2",
+    "node-cron": "^4.2.1",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0",
     "winston": "^3.11.0",

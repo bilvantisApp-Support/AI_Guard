@@ -5,6 +5,7 @@ import { PatGenerator } from '../../auth/pat/pat-generator';
 import { ScopeValidator } from '../../auth/pat/pat-scopes';
 import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
+import { projectRepository } from '../../database/repositories';
 
 export class UsersController {
   /**
@@ -17,10 +18,10 @@ export class UsersController {
       if (!auth?.user) {
         throw new ProxyError(ProxyErrorType.AUTHENTICATION_ERROR, 401, 'Authentication required');
       }
-      
+
       const userId = auth.user._id;
       const user = await userRepository.getUserWithDefaultProject(userId);
-      
+
       if (!user) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'User not found');
       }
@@ -37,6 +38,36 @@ export class UsersController {
       };
     } catch (error) {
       logger.error('Failed to get user profile:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all user profile
+   * GET /_api/users
+   */
+  static async listProfiles(ctx: Context): Promise<void> {
+    try {
+      const auth = ctx.state.auth;
+      if (!auth?.user) {
+        throw new ProxyError(ProxyErrorType.AUTHENTICATION_ERROR, 401, 'Authentication required');
+      }
+
+      const users = await userRepository.getActiveUsers();
+
+      ctx.body = {
+        users: users.map(user => ({
+          id: user._id,
+          email: user.email,
+          name: user.name,
+          status: user.status,
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt,
+        })),
+        total: users.length,
+      };
+    } catch (error) {
+      logger.error('Failed to get user profiles:', error);
       throw error;
     }
   }
@@ -64,7 +95,7 @@ export class UsersController {
       }
 
       const updatedUser = await userRepository.updateUser(userId, updateData);
-      
+
       if (!updatedUser) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'User not found');
       }
@@ -95,10 +126,10 @@ export class UsersController {
         return;
       }
       const userId = ctx.state.auth.user._id;
-      
+
       // Soft delete the user
       const deletedUser = await userRepository.deleteUser(userId);
-      
+
       if (!deletedUser) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'User not found');
       }
@@ -130,8 +161,8 @@ export class UsersController {
         ctx.body = { error: 'Authentication required' };
         return;
       }
-      const userId = ctx.state.auth.user._id.toString();
-      const { name, scopes, llmProvider, projectId, expiresInDays } = ctx.request.body as any;
+      const authUserId = ctx.state.auth.user._id.toString();
+      const { name, scopes, llmProvider, projectId, userId, expiresInDays } = ctx.request.body as any;
 
       // Validate required fields
       if (!name) {
@@ -149,6 +180,26 @@ export class UsersController {
       // Validate scopes
       if (!ScopeValidator.validateScopes(scopes)) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Invalid scopes provided');
+      }
+
+      //Check the token generator project member or not
+      const isMember = await projectRepository.isMember(projectId, authUserId);
+
+      if (!isMember) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Requesting user is not a member of the project');
+      }
+
+      const memberRole = await projectRepository.getMemberRole(projectId, authUserId);
+      if (memberRole == 'member') {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 403, 'Members are not allowed to create PAT');
+
+      }
+
+      //Check the target user should project member
+      const targetMember = await projectRepository.isMember(projectId, userId);
+
+      if (!targetMember) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 403, 'User not a member of the project');
       }
 
       // Check name uniqueness
@@ -174,6 +225,7 @@ export class UsersController {
         scopes: tokenRecord.scopes,
         llmProvider: tokenRecord.llmProvider,
         projectId: tokenRecord.projectId,
+        userId: tokenRecord.userId,
         expiresAt: tokenRecord.expiresAt,
         createdAt: tokenRecord.createdAt,
       };
@@ -196,9 +248,9 @@ export class UsersController {
       }
       const userId = ctx.state.auth.user._id;
       const includeRevoked = ctx.query.includeRevoked === 'true';
-      
+
       const tokens = await tokenRepository.findByUserId(userId, includeRevoked);
-      
+
       ctx.body = {
         tokens: tokens.map(token => ({
           id: token._id,
@@ -239,7 +291,7 @@ export class UsersController {
       }
 
       const revokedToken = await tokenRepository.revokeToken(tokenId);
-      
+
       if (!revokedToken) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Token not found');
       }
@@ -270,7 +322,7 @@ export class UsersController {
       const tokenId = ctx.params.tokenId;
 
       const result = await PatGenerator.rotateToken(tokenId, userId);
-      
+
       if (!result) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Token not found or unauthorized');
       }
