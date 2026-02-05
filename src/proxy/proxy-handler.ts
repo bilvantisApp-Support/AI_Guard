@@ -114,8 +114,9 @@ export class ProxyHandler {
       metadata.keySource = source;
       metadata.keyId = keyId;
 
+      const forwardPath = ctx.path.replace(/^\/proxy/, '');
       // Build target URL
-      const targetUrl = new URL(ctx.path, providerConfig.host);
+      const targetUrl = new URL(forwardPath, providerConfig.host);
       
       // Add original query parameters
       if (ctx.querystring) {
