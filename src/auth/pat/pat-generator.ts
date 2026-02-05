@@ -8,6 +8,7 @@ export interface GenerateTokenOptions {
   projectId?: string;
   name: string;
   scopes: string[];
+  llmProvider: string;
   expiresInDays?: number;
 }
 
@@ -41,6 +42,7 @@ export class PatGenerator {
         projectId: options.projectId as any,
         name: options.name,
         scopes: options.scopes,
+        llmProvider: options.llmProvider,
         expiresAt,
       });
 
@@ -92,6 +94,7 @@ export class PatGenerator {
         projectId: existingToken.projectId?.toString(),
         name: `${existingToken.name} (Rotated)`,
         scopes: existingToken.scopes,
+        llmProvider: existingToken.llmProvider,
         expiresInDays: existingToken.expiresAt
           ? Math.ceil((existingToken.expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
           : undefined,

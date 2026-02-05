@@ -8,6 +8,7 @@ const router = new Router();
 router.use(AuthMiddleware.requireAuth());
 
 // Profile management
+router.get('/', UsersController.listProfiles);
 router.get('/profile', UsersController.getProfile);
 router.put('/profile', UsersController.updateProfile);
 router.delete('/account', UsersController.deleteAccount);

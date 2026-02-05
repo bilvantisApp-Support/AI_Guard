@@ -50,6 +50,7 @@ export interface IUsageMetrics {
 export interface IProject extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
+  description:string;
   ownerId: mongoose.Types.ObjectId;
   members: IProjectMember[];
   apiKeys: IProviderApiKey[];
@@ -122,6 +123,9 @@ const projectSchema = new Schema<IProject>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+    },
+    description:{
+      type:String,
     },
     members: [projectMemberSchema],
     apiKeys: [providerApiKeySchema],

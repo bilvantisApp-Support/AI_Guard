@@ -17,6 +17,7 @@ import { quotaChecker } from '../interceptors/request/quota-checker';
 import { requestValidator } from '../interceptors/request/request-validator';
 import { usageTracker } from '../interceptors/response/usage-tracker';
 import { AuthMiddleware } from '../auth/auth-middleware';
+import { resetDailyAndMonthlyUsage } from '../utils/usage-cron';
 
 // Create Koa app
 const app = new Koa();
@@ -102,6 +103,9 @@ export async function startServer(): Promise<void> {
     logger.error('Failed to connect to database:', error);
     process.exit(1);
   }
+
+  //Initialize usage reset here
+  resetDailyAndMonthlyUsage();
 
   // Initialize Firebase Admin SDK
   try {

@@ -7,6 +7,7 @@ import { usageTracker } from '../../interceptors/response/usage-tracker';
 import { quotaChecker } from '../../interceptors/request/quota-checker';
 import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
+import mongoose from 'mongoose';
 
 export class ProjectsController {
   /**
@@ -21,14 +22,18 @@ export class ProjectsController {
         return;
       }
       const userId = ctx.state.auth.user._id;
-      const { name } = ctx.request.body as any;
+      const { name,description } = ctx.request.body as any;
 
       if (!name || !name.trim()) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project name is required');
       }
+      if (!description) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project description is required');
+      }
 
       const project = await projectRepository.createProject({
         name: name.trim(),
+        description,
         ownerId: userId,
       });
 
@@ -57,9 +62,9 @@ export class ProjectsController {
         return;
       }
       const userId = ctx.state.auth.user._id;
-      
+
       const projects = await projectRepository.findByMember(userId);
-      
+
       ctx.body = {
         projects: projects.map(project => ({
           id: project._id,
@@ -93,8 +98,8 @@ export class ProjectsController {
       }
       const userId = ctx.state.auth.user._id;
 
-      const project = await projectRepository.findById(projectId);
-      
+      const project = await projectRepository.findByIdWithMembers(projectId);
+
       if (!project) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
@@ -106,16 +111,38 @@ export class ProjectsController {
       }
 
       const userRole = await projectRepository.getMemberRole(projectId, userId);
-      
+
       ctx.body = {
         id: project._id,
         name: project.name,
+        description: project.description,
         ownerId: project.ownerId,
-        members: project.members.map(member => ({
-          userId: member.userId,
-          role: member.role,
-          addedAt: member.addedAt,
-        })),
+        members: project.members.map(member => {
+          let userId, name, email;
+          if (
+            typeof member.userId === 'object' &&
+            member.userId !== null &&
+            'name' in member.userId &&
+            'email' in member.userId
+          ) {
+            userId = member.userId._id as mongoose.Types.ObjectId;
+            name = member.userId.name as string;
+            email = member.userId.email as string;
+          } else {
+            userId = member.userId;
+            name = undefined;
+            email = undefined;
+          }
+
+          return {
+            userId,
+            name,
+            email,
+            role: member.role,
+            addedAt: member.addedAt,
+          };
+        }),
+
         settings: project.settings,
         usage: project.usage,
         userRole,
@@ -158,7 +185,7 @@ export class ProjectsController {
       }
 
       const updatedProject = await projectRepository.updateProject(projectId, updateData);
-      
+
       if (!updatedProject) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
@@ -190,7 +217,7 @@ export class ProjectsController {
       const userId = ctx.state.auth.user._id;
 
       const project = await projectRepository.findById(projectId);
-      
+
       if (!project) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
@@ -201,7 +228,7 @@ export class ProjectsController {
       }
 
       await projectRepository.deleteProject(projectId);
-      
+
       ctx.body = {
         message: 'Project deleted successfully',
         projectId,
@@ -292,7 +319,7 @@ export class ProjectsController {
       }
 
       const project = await projectRepository.findById(projectId);
-      
+
       if (!project) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
@@ -349,7 +376,7 @@ export class ProjectsController {
       }
 
       const updatedProject = await projectRepository.removeApiKey(projectId, keyId);
-      
+
       if (!updatedProject) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project or API key not found');
       }
@@ -390,7 +417,7 @@ export class ProjectsController {
       const end = endDate ? new Date(endDate as string) : new Date();
 
       const stats = await usageTracker.getProjectUsageStats(projectId, start, end);
-      
+
       ctx.body = {
         projectId,
         period: { start, end },
@@ -423,13 +450,13 @@ export class ProjectsController {
       }
 
       const project = await projectRepository.findById(projectId);
-      
+
       if (!project) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
 
       const quotaStatus = await quotaChecker.checkQuota(project);
-      
+
       ctx.body = {
         projectId,
         ...quotaStatus,
@@ -503,6 +530,90 @@ export class ProjectsController {
   }
 
   /**
+   * Update member from project
+   * PUT /_api/projects/:id/members/:memberId
+   */
+
+  static async updateMemberRole(ctx: Context): Promise<void> {
+    try {
+      const projectId = ctx.params.id;
+      const memberId = ctx.params.memberId;
+      const { role } = ctx.request.body as { role: 'admin' | 'member' }
+
+      if (!ctx.state.auth) {
+        ctx.status = 401;
+        ctx.body = { error: 'Authentication required' };
+        return;
+      }
+
+      const userId = ctx.state.auth.user._id;
+
+      //Check valid roles
+      if (!role || !['admin', 'member'].includes(role)) {
+        throw new ProxyError(
+          ProxyErrorType.INVALID_REQUEST,
+          400,
+          'Invalid role'
+        );
+      }
+
+      // Check permissions
+      const userRole = await projectRepository.getMemberRole(projectId, userId);
+      if (!userRole || !['owner', 'admin'].includes(userRole)) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 403, 'Insufficient permissions');
+      }
+
+      //Check project exist
+      const project = await projectRepository.findById(projectId);
+      if (!project) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
+      }
+
+      //Check member exist
+      const selectedMember = project.members.find(
+        (m) => m.userId == memberId
+      );
+      if (!selectedMember) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'selected member not found');
+      }
+
+      //Owner role cannot be changed
+      if (selectedMember.role == 'owner') {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Cannot change owner role');
+      }
+
+      //Prevent to change same role
+      if (selectedMember.role == role) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Member already has this role');
+      }
+
+      // Update role
+      const updatedProject = await projectRepository.updateMemberRole(
+        projectId,
+        memberId,
+        role
+      );
+
+      if (!updatedProject) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project or member not found');
+      }
+
+      ctx.body = {
+        message: 'Member role updated successfully',
+        member: {
+          userId: memberId,
+          role,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+
+    } catch (error) {
+      logger.error('Failed to update member role:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Remove member from project
    * DELETE /_api/projects/:id/members/:memberId
    */
@@ -534,7 +645,7 @@ export class ProjectsController {
       }
 
       const updatedProject = await projectRepository.removeMember(projectId, memberId);
-      
+
       if (!updatedProject) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project or member not found');
       }

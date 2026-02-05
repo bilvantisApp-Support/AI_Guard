@@ -27,6 +27,7 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/swagger.yaml /swagger.yaml
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \

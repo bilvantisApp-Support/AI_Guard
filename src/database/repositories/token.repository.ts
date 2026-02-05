@@ -9,6 +9,7 @@ export interface CreateTokenDto {
   name: string;
   description?: string;
   scopes: string[];
+  llmProvider: string;
   expiresAt?: Date;
 }
 

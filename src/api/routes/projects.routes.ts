@@ -25,6 +25,7 @@ router.get('/:id/quota', ProjectsController.getQuotaStatus);
 
 // Member management
 router.post('/:id/members', ProjectsController.addMember);
+router.put('/:id/members/:memberId', ProjectsController.updateMemberRole);
 router.delete('/:id/members/:memberId', ProjectsController.removeMember);
 
 export { router as projectsRouter };

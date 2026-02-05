@@ -3,6 +3,7 @@ import { Project, IProject, IProviderApiKey, IProjectMember, IUsageMetrics } fro
 
 export interface CreateProjectDto {
   name: string;
+  description?: string;
   ownerId: mongoose.Types.ObjectId;
 }
 
@@ -50,6 +51,14 @@ export class ProjectRepository {
   async findById(projectId: string | mongoose.Types.ObjectId): Promise<IProject | null> {
     return await Project.findById(projectId).exec();
   }
+  
+  async findByIdWithMembers(projectId: String | mongoose.Types.ObjectId): Promise<IProject | null> {
+    return await Project.findById(projectId).populate({
+      path: 'members.userId',
+      select: 'name email'
+    }).exec();
+  }
+
 
   async findByOwner(ownerId: string | mongoose.Types.ObjectId): Promise<IProject[]> {
     return await Project.find({ ownerId }).exec();
@@ -82,7 +91,10 @@ export class ProjectRepository {
 
     return await Project.findByIdAndUpdate(
       projectId,
-      { $push: { apiKeys: apiKey } },
+      {
+        $push: { apiKeys: apiKey },
+        $addToSet: { 'settings.allowedProviders': apiKey.provider }
+      },
       { new: true }
     ).exec();
   }

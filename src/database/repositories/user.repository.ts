@@ -25,6 +25,10 @@ export class UserRepository {
     return await User.findById(userId).exec();
   }
 
+  async getActiveUsers(): Promise<IUser[] > {
+    return await User.find({status: "active"}).exec()
+  }
+
   async findByFirebaseUid(uid: string): Promise<IUser | null> {
     return await User.findOne({ firebaseUid: uid }).exec();
   }

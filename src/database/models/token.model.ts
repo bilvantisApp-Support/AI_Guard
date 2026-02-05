@@ -9,6 +9,7 @@ export interface IPersonalAccessToken extends Document {
   name: string;
   description?: string;
   scopes: string[];
+  llmProvider: string;
   lastUsedAt?: Date;
   expiresAt?: Date;
   createdAt: Date;
@@ -59,6 +60,10 @@ const personalAccessTokenSchema = new Schema<IPersonalAccessToken>(
         'admin',
       ],
     }],
+    llmProvider: {
+      type: String,
+      enum: ['openai', 'anthropic', 'gemini']
+    },
     lastUsedAt: {
       type: Date,
     },
