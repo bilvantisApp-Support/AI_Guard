@@ -48,7 +48,7 @@ router.get('/ready', (ctx) => {
 router.use('/_api', apiRouter.routes(), apiRouter.allowedMethods());
 
 // Proxy routes with interceptors
-router.all('/proxy/(.*)', 
+router.all('/(.*)', 
   // Required auth for proxy (supports both Firebase and PAT)
   AuthMiddleware.requireAuth(),
   

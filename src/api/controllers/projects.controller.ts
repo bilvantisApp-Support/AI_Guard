@@ -8,6 +8,7 @@ import { quotaChecker } from '../../interceptors/request/quota-checker';
 import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
 import mongoose from 'mongoose';
+import { rateLimiter } from '../../interceptors';
 
 export class ProjectsController {
   /**
@@ -167,6 +168,11 @@ export class ProjectsController {
         ctx.body = { error: 'Authentication required' };
         return;
       }
+
+      const existingProject = await projectRepository.findById(projectId);
+      if(!existingProject){
+         throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, 'Project not found');
+      }
       const userId = ctx.state.auth.user._id;
       const { name, settings } = ctx.request.body as any;
 
@@ -178,7 +184,25 @@ export class ProjectsController {
 
       const updateData: any = {};
       if (name !== undefined) updateData.name = name;
-      if (settings !== undefined) updateData.settings = settings;
+      type Plan = 'free' | 'pro' | 'enterprise' | 'custom';
+      if (settings?.plan) {
+        const plan = settings.plan as Plan;
+        const rateDefaults = rateLimiter.getDefaults();
+        const quotaDefaults = quotaChecker.getDefaults();
+
+        updateData.settings = {
+          ...existingProject.settings,
+          plan,
+          rateLimitOverride:
+            plan === 'custom'
+              ? settings.rateLimitOverride
+              : rateDefaults[plan],
+          quotaOverride:
+            plan === 'custom'
+              ? settings.quotaOverride
+              : quotaDefaults[plan],
+        };
+      }
 
       if (Object.keys(updateData).length === 0) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'No valid fields to update');
