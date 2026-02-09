@@ -28,6 +28,10 @@ export class RateLimiter {
     enterprise: { windowMs: 60000, maxRequests: 1000 },
   };
 
+  public getDefaults():TierRateLimits {
+    return this.defaultLimits;
+  }
+
   constructor() {
     this.initializeRedis();
   }

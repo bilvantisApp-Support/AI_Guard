@@ -2,6 +2,7 @@ import { Context, Next } from 'koa';
 import { UsageRecord } from '../../database/models/usage.model';
 import { projectRepository } from '../../database/repositories/project.repository';
 import { logger } from '../../utils/logger';
+import mongoose from 'mongoose';
 
 export interface UsageData {
   provider: string;
@@ -247,12 +248,13 @@ export class UsageTracker {
     totalCost: number;
     byProvider: Record<string, any>;
     byModel: Record<string, any>;
+    byUser: Record<string, any>;
   }> {
     try {
       const records = await UsageRecord.aggregate([
         {
           $match: {
-            projectId: projectId,
+            projectId: new mongoose.Types.ObjectId(projectId),
             timestamp: { $gte: startDate, $lte: endDate },
           },
         },
@@ -276,6 +278,13 @@ export class UsageTracker {
                 cost: '$cost',
               },
             },
+            byUser: {
+              $push: {
+                userId: '$userId',
+                tokens: '$totalTokens',
+                cost: '$cost',
+              },
+            },
           },
         },
       ]);
@@ -287,6 +296,7 @@ export class UsageTracker {
           totalCost: 0,
           byProvider: {},
           byModel: {},
+          byUser:{}
         };
       }
 
@@ -295,6 +305,7 @@ export class UsageTracker {
       // Process provider and model breakdowns
       const byProvider = this.aggregateBy(result.byProvider, 'provider');
       const byModel = this.aggregateBy(result.byModel, 'model');
+      const byUser = this.aggregateBy(result.byUser,'userId')
 
       return {
         totalRequests: result.totalRequests,
@@ -302,6 +313,7 @@ export class UsageTracker {
         totalCost: result.totalCost || 0,
         byProvider,
         byModel,
+        byUser,
       };
     } catch (error) {
       logger.error('Failed to get project usage stats:', error);

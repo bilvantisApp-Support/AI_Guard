@@ -16,6 +16,7 @@ export interface IProjectMember {
 }
 
 export interface IProjectSettings {
+  plan?: 'free' | 'pro' | 'enterprise' | 'custom';
   rateLimitOverride?: {
     windowMs: number;
     maxRequests: number;
@@ -130,6 +131,11 @@ const projectSchema = new Schema<IProject>(
     members: [projectMemberSchema],
     apiKeys: [providerApiKeySchema],
     settings: {
+      plan: {
+        type: String,
+        enum: ['free', 'pro', 'enterprise', 'custom'],
+        default: 'free',
+      },
       rateLimitOverride: {
         windowMs: Number,
         maxRequests: Number,
