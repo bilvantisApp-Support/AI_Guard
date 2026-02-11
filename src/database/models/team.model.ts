@@ -1,21 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IProviderApiKey {
-  provider: 'openai' | 'anthropic' | 'gemini';
-  encryptedKey: string;
-  keyId: string; // For key rotation
-  isActive: boolean;
-  addedBy: mongoose.Types.ObjectId;
-  addedAt: Date;
-}
-
-export interface IProjectMember {
+export interface ITeamMember {
   userId: mongoose.Types.ObjectId;
   role: 'owner' | 'admin' | 'member';
   addedAt: Date;
 }
 
-export interface IProjectSettings {
+export interface ITeamSettings {
   plan?: 'free' | 'pro' | 'enterprise' | 'custom';
   rateLimitOverride?: {
     windowMs: number;
@@ -29,7 +20,7 @@ export interface IProjectSettings {
   webhookUrl?: string;
 }
 
-export interface IUsageMetrics {
+export interface ITeamUsageMetrics {
   total: {
     requests: number;
     tokens: number;
@@ -48,53 +39,19 @@ export interface IUsageMetrics {
   lastUpdated: Date;
 }
 
-export interface IProject extends Document {
+export interface ITeam extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
-  description:string;
+  description?: string;
   ownerId: mongoose.Types.ObjectId;
-  teamId?: mongoose.Types.ObjectId;
-  members: IProjectMember[];
-  apiKeys: IProviderApiKey[];
-  settings: IProjectSettings;
-  usage: IUsageMetrics;
+  members: ITeamMember[];
+  settings: ITeamSettings;
+  usage: ITeamUsageMetrics;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const providerApiKeySchema = new Schema<IProviderApiKey>(
-  {
-    provider: {
-      type: String,
-      enum: ['openai', 'anthropic', 'gemini'],
-      required: true,
-    },
-    encryptedKey: {
-      type: String,
-      required: true,
-    },
-    keyId: {
-      type: String,
-      required: true,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    addedBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    addedAt: {
-      type: Date,
-      default: Date.now,
-    },
-  },
-  { _id: false }
-);
-
-const projectMemberSchema = new Schema<IProjectMember>(
+const teamMemberSchema = new Schema<ITeamMember>(
   {
     userId: {
       type: Schema.Types.ObjectId,
@@ -114,27 +71,22 @@ const projectMemberSchema = new Schema<IProjectMember>(
   { _id: false }
 );
 
-const projectSchema = new Schema<IProject>(
+const teamSchema = new Schema<ITeam>(
   {
     name: {
       type: String,
       required: true,
       trim: true,
     },
+    description: {
+      type: String,
+    },
     ownerId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
-    description:{
-      type:String,
-    },
-    teamId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Team',
-    },
-    members: [projectMemberSchema],
-    apiKeys: [providerApiKeySchema],
+    members: [teamMemberSchema],
     settings: {
       plan: {
         type: String,
@@ -177,9 +129,8 @@ const projectSchema = new Schema<IProject>(
 );
 
 // Indexes
-projectSchema.index({ ownerId: 1 });
-projectSchema.index({ 'members.userId': 1 });
-projectSchema.index({ name: 1 });
-projectSchema.index({ teamId: 1 });
+teamSchema.index({ ownerId: 1 });
+teamSchema.index({ 'members.userId': 1 });
+teamSchema.index({ name: 1 });
 
-export const Project = mongoose.model<IProject>('Project', projectSchema);
+export const Team = mongoose.model<ITeam>('Team', teamSchema);
