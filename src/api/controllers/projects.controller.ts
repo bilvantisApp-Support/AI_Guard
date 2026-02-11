@@ -71,6 +71,7 @@ export class ProjectsController {
           id: project._id,
           name: project.name,
           ownerId: project.ownerId,
+          teamId: project.teamId,
           memberCount: project.members.length,
           apiKeyCount: project.apiKeys.length,
           role: project.members.find(m => m.userId.toString() === userId.toString())?.role,
@@ -118,6 +119,7 @@ export class ProjectsController {
         name: project.name,
         description: project.description,
         ownerId: project.ownerId,
+        teamId: project.teamId,
         members: project.members.map(member => {
           let userId, name, email;
           if (

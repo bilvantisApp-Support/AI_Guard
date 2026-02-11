@@ -1,6 +1,7 @@
 import { Context, Next } from 'koa';
 import { UsageRecord } from '../../database/models/usage.model';
 import { projectRepository } from '../../database/repositories/project.repository';
+import { teamRepository } from '../../database/repositories/team.repository';
 import { logger } from '../../utils/logger';
 import mongoose from 'mongoose';
 
@@ -47,13 +48,27 @@ export class UsageTracker {
       }
 
       const usageData = this.extractUsageData(ctx, provider, responseTime);
-      
+      const projectId = (auth.token as any)?._doc?.projectId?.toString();
+      const teamId = projectId
+        ? await this.resolveTeamId(auth.user._id.toString(), projectId)
+        : undefined;
+
       // Save detailed usage record
-      await this.saveUsageRecord(auth.user._id.toString(), (auth.token as any)?._doc?.projectId?.toString(), usageData);
+      await this.saveUsageRecord(
+        auth.user._id.toString(),
+        projectId,
+        teamId,
+        usageData
+      );
 
       // Update project usage aggregates
       if ((auth.token as any)?._doc?.projectId) {
         await this.updateProjectUsage((auth.token as any)?._doc?.projectId, usageData);
+      }
+
+      // Update team usage aggregates
+      if (teamId) {
+        await this.updateTeamUsage(teamId, usageData);
       }
 
     } catch (error) {
@@ -131,12 +146,14 @@ export class UsageTracker {
   private async saveUsageRecord(
     userId: string,
     projectId: string | undefined,
+    teamId: string | undefined,
     usageData: UsageData
   ): Promise<void> {
     try {
       const record = new UsageRecord({
         userId,
         projectId,
+        teamId,
         provider: usageData.provider,
         endpoint: usageData.endpoint,
         method: usageData.method,
@@ -168,6 +185,46 @@ export class UsageTracker {
       });
     } catch (error) {
       logger.error('Failed to update project usage:', error);
+    }
+  }
+
+  /**
+   * Update team usage aggregates
+   */
+  private async updateTeamUsage(teamId: string, usageData: UsageData): Promise<void> {
+    try {
+      await teamRepository.updateUsage(teamId, {
+        requests: 1,
+        tokens: usageData.totalTokens || 1,
+        cost: usageData.cost || 0,
+      });
+    } catch (error) {
+      logger.error('Failed to update team usage:', error);
+    }
+  }
+
+  /**
+   * Resolve team for usage attribution
+   * Only attribute to a team if:
+   * - the project is assigned to a team, and
+   * - the user is a member of that team
+   */
+  private async resolveTeamId(userId: string, projectId: string): Promise<string | undefined> {
+    try {
+      const project = await projectRepository.findById(projectId);
+      if (!project?.teamId) {
+        return undefined;
+      }
+
+      const isMember = await teamRepository.isMember(project.teamId, userId);
+      if (!isMember) {
+        return undefined;
+      }
+
+      return project.teamId.toString();
+    } catch (error) {
+      logger.error('Failed to resolve team for usage:', error);
+      return undefined;
     }
   }
 
@@ -317,6 +374,119 @@ export class UsageTracker {
       };
     } catch (error) {
       logger.error('Failed to get project usage stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get usage statistics for a team
+   * Includes only usage by team members on projects assigned to the team
+   */
+  public async getTeamUsageStats(
+    teamId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<{
+    totalRequests: number;
+    totalTokens: number;
+    totalCost: number;
+    byProvider: Record<string, any>;
+    byModel: Record<string, any>;
+    byUser: Record<string, any>;
+  }> {
+    try {
+      const team = await teamRepository.findById(teamId);
+      if (!team) {
+        return {
+          totalRequests: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          byProvider: {},
+          byModel: {},
+          byUser: {},
+        };
+      }
+
+      const memberIds = team.members.map((m) => m.userId);
+      const projects = await projectRepository.findByTeam(teamId);
+      const projectIds = projects.map((p) => p._id);
+
+      if (memberIds.length === 0 || projectIds.length === 0) {
+        return {
+          totalRequests: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          byProvider: {},
+          byModel: {},
+          byUser: {},
+        };
+      }
+
+      const records = await UsageRecord.aggregate([
+        {
+          $match: {
+            projectId: { $in: projectIds },
+            userId: { $in: memberIds },
+            timestamp: { $gte: startDate, $lte: endDate },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalRequests: { $sum: 1 },
+            totalTokens: { $sum: '$totalTokens' },
+            totalCost: { $sum: '$cost' },
+            byProvider: {
+              $push: {
+                provider: '$provider',
+                tokens: '$totalTokens',
+                cost: '$cost',
+              },
+            },
+            byModel: {
+              $push: {
+                model: '$modelName',
+                tokens: '$totalTokens',
+                cost: '$cost',
+              },
+            },
+            byUser: {
+              $push: {
+                userId: '$userId',
+                tokens: '$totalTokens',
+                cost: '$cost',
+              },
+            },
+          },
+        },
+      ]);
+
+      if (!records.length) {
+        return {
+          totalRequests: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          byProvider: {},
+          byModel: {},
+          byUser: {},
+        };
+      }
+
+      const result = records[0];
+      const byProvider = this.aggregateBy(result.byProvider, 'provider');
+      const byModel = this.aggregateBy(result.byModel, 'model');
+      const byUser = this.aggregateBy(result.byUser, 'userId');
+
+      return {
+        totalRequests: result.totalRequests,
+        totalTokens: result.totalTokens || 0,
+        totalCost: result.totalCost || 0,
+        byProvider,
+        byModel,
+        byUser,
+      };
+    } catch (error) {
+      logger.error('Failed to get team usage stats:', error);
       throw error;
     }
   }
