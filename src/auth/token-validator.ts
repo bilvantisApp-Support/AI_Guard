@@ -45,6 +45,7 @@ export class TokenValidator {
           firebaseUid: decodedToken.uid,
           email: firebaseUser.email || decodedToken.email || '',
           name: firebaseUser.displayName || decodedToken.name || 'Unknown User',
+          role: 'member',
           status: 'active',
         });
       }

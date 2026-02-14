@@ -5,11 +5,13 @@ export interface CreateUserDto {
   firebaseUid?: string;
   email: string;
   name: string;
+  role?: 'owner' | 'admin' | 'member';
   status?: 'active' | 'suspended' | 'deleted';
 }
 
 export interface UpdateUserDto {
   name?: string;
+  role?: 'owner' | 'admin' | 'member';
   status?: 'active' | 'suspended' | 'deleted';
   defaultProject?: mongoose.Types.ObjectId;
   lastLoginAt?: Date;

@@ -57,6 +57,7 @@ export class AdminController {
           id: user._id,
           email: user.email,
           name: user.name,
+          role: user.role,
           status: user.status,
           createdAt: user.createdAt,
           lastLoginAt: user.lastLoginAt,
@@ -82,12 +83,16 @@ export class AdminController {
     try {
       const userId = ctx.params.id;
       const { status } = ctx.request.body as any;
+      const { role } = ctx.request.body as any;
 
       if (!status || !['active', 'suspended', 'deleted'].includes(status)) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Valid status is required');
       }
+      if (!role || !['admin', 'member'].includes(role)) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Valid role is required');
+      }
 
-      const updatedUser = await userRepository.updateUser(userId, { status });
+      const updatedUser = await userRepository.updateUser(userId, { status,role });
       
       if (!updatedUser) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'User not found');
@@ -96,6 +101,7 @@ export class AdminController {
       ctx.body = {
         id: updatedUser._id,
         email: updatedUser.email,
+        role: updatedUser.role,
         name: updatedUser.name,
         status: updatedUser.status,
         updatedAt: updatedUser.updatedAt,
