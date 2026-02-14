@@ -25,6 +25,11 @@ export class QuotaChecker {
     enterprise: { monthlyLimit: 1000000, dailyLimit: 50000 },
   };
 
+  public getDefaults(): Record<'free' | 'pro' | 'enterprise', QuotaLimits> {
+    return this.defaultQuotas;
+  }
+
+
   /**
    * Create quota checking middleware
    */

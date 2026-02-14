@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { projectRepository } from '../database/repositories/project.repository';
+import { teamRepository } from '../database/repositories/team.repository';
 import { logger } from '../utils/logger';
 
 export function resetDailyAndMonthlyUsage() {
@@ -10,7 +11,13 @@ export function resetDailyAndMonthlyUsage() {
         try {
             await projectRepository.resetDailyUsage();
         } catch (err) {
-            logger.error('Daily usage reset failed', err);
+            logger.error('Project daily usage reset failed', err);
+        }
+
+        try {
+            await teamRepository.resetDailyUsage();
+        } catch (err) {
+            logger.error('Team daily usage reset failed', err);
         }
     });
 
@@ -20,7 +27,13 @@ export function resetDailyAndMonthlyUsage() {
         try {
             await projectRepository.resetMonthlyUsage();
         } catch (err) {
-            logger.error('Monthly usage reset failed', err);
+            logger.error('Project monthly usage reset failed', err);
+        }
+
+        try {
+            await teamRepository.resetMonthlyUsage();
+        } catch (err) {
+            logger.error('Team monthly usage reset failed', err);
         }
     });
 

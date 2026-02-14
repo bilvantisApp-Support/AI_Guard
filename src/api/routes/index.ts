@@ -1,6 +1,7 @@
 import Router from '@koa/router';
 import { usersRouter } from './users.routes';
 import { projectsRouter } from './projects.routes';
+import { teamsRouter } from './teams.routes';
 import { adminRouter } from './admin.routes';
 import { swaggerRouter } from './swagger.routes';
 import { dashboardRouter } from './dashboard.routes';
@@ -15,6 +16,7 @@ apiRouter.use(errorEnricher.createMiddleware());
 // API routes
 apiRouter.use('/users', usersRouter.routes(), usersRouter.allowedMethods());
 apiRouter.use('/projects', projectsRouter.routes(), projectsRouter.allowedMethods());
+apiRouter.use('/teams', teamsRouter.routes(), teamsRouter.allowedMethods());
 apiRouter.use('/admin', adminRouter.routes(), adminRouter.allowedMethods());
 apiRouter.use('/dashboard', dashboardRouter.routes(), dashboardRouter.allowedMethods());
 apiRouter.use('/analytics', analyticsRouter.routes(), analyticsRouter.allowedMethods());

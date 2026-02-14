@@ -4,6 +4,7 @@ import { AuthMiddleware } from '../../auth/auth-middleware';
 
 const router = new Router();
 
+router.use(AuthMiddleware.requireAuth());
 // All admin routes require admin authentication
 router.use(AuthMiddleware.requireAdmin());
 

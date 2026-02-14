@@ -68,6 +68,10 @@ export class ProjectRepository {
     return await Project.find({ 'members.userId': userId }).exec();
   }
 
+  async findByTeam(teamId: string | mongoose.Types.ObjectId): Promise<IProject[]> {
+    return await Project.find({ teamId }).exec();
+  }
+
   async updateProject(
     projectId: string | mongoose.Types.ObjectId,
     updateData: UpdateProjectDto
@@ -215,6 +219,27 @@ export class ProjectRepository {
     );
 
     return member?.role || null;
+  }
+
+  async assignTeam(
+    projectId: string | mongoose.Types.ObjectId,
+    teamId: string | mongoose.Types.ObjectId
+  ): Promise<IProject | null> {
+    return await Project.findByIdAndUpdate(
+      projectId,
+      { $set: { teamId } },
+      { new: true }
+    ).exec();
+  }
+
+  async removeTeam(
+    projectId: string | mongoose.Types.ObjectId
+  ): Promise<IProject | null> {
+    return await Project.findByIdAndUpdate(
+      projectId,
+      { $unset: { teamId: 1 } },
+      { new: true }
+    ).exec();
   }
 
   async updateUsage(

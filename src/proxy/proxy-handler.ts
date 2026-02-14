@@ -115,8 +115,7 @@ export class ProxyHandler {
       metadata.keyId = keyId;
 
       // Build target URL
-      const targetUrl = new URL(ctx.path, providerConfig.host);
-      
+      const targetUrl = new URL(ctx.path, providerConfig.host);      
       // Add original query parameters
       if (ctx.querystring) {
         targetUrl.search = ctx.querystring;
