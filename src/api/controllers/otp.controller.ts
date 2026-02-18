@@ -22,7 +22,7 @@ export class OTPController {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid email format");
             }
 
-            if(!name || !name.trim()){
+            if (!name || !name.trim()) {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "name is required");
             }
             await otpService.sendOTP(email, name);
@@ -44,6 +44,14 @@ export class OTPController {
             const { email, otp } = ctx.request.body as { email: string; otp: string; };
             if (!email || !otp) {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Email and OTP required");
+            }
+            const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!regex.test(email)) {
+                throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid email format");
+            }
+
+            if (!/^[0-9]{6}$/.test(otp)) {
+                throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid OTP format");
             }
             const valid = await otpService.verifyOTP(email, otp);
 
