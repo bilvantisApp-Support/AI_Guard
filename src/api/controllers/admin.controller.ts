@@ -82,18 +82,24 @@ export class AdminController {
   static async updateUser(ctx: Context): Promise<void> {
     try {
       const userId = ctx.params.id;
-      const { status } = ctx.request.body as any;
-      const { role } = ctx.request.body as any;
+      const { status, role } = ctx.request.body as {
+        status: 'active' | 'suspended' | 'deleted';
+        role: 'owner' | 'admin' | 'member';
+      };
 
-      if (!status || !['active', 'suspended', 'deleted'].includes(status)) {
+      if (status && !['active', 'suspended', 'deleted'].includes(status)) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Valid status is required');
       }
-      if (!role || !['admin', 'member'].includes(role)) {
+      if (role && !['owner', 'admin', 'member'].includes(role)) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Valid role is required');
       }
 
-      const updatedUser = await userRepository.updateUser(userId, { status,role });
-      
+      if(!status && !role){
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Please provide status or role to update the user")
+      }
+
+      const updatedUser = await userRepository.updateUser(userId, { status, role });
+
       if (!updatedUser) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'User not found');
       }
@@ -193,7 +199,7 @@ export class AdminController {
   static async resetUserLimits(ctx: Context): Promise<void> {
     try {
       const userId = ctx.params.id;
-      
+
       // Reset rate limits
       await rateLimiter.resetLimit(`ratelimit:user:${userId}`);
 

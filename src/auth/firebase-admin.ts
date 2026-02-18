@@ -5,7 +5,7 @@ export class FirebaseAdmin {
   private static instance: FirebaseAdmin;
   private initialized = false;
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): FirebaseAdmin {
     if (!FirebaseAdmin.instance) {
@@ -90,6 +90,23 @@ export class FirebaseAdmin {
       return null;
     }
   }
+
+  public async generatePasswordResetLink(email: string): Promise<string | null> {
+    if (!this.initialized) {
+      logger.warn("Firebase Admin SDK not initialized");
+      return null;
+    }
+    try {
+      const link = await admin.auth().generatePasswordResetLink(email, {
+        url: `${process.env.FRONTEND_URL}/reset-password`
+      });
+      return link;
+    } catch (error) {
+      logger.error("Failed to generate password reset link:", error);
+      return null;
+    }
+  }
+
 
   public isInitialized(): boolean {
     return this.initialized;

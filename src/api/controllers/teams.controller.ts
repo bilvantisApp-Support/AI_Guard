@@ -16,16 +16,20 @@ export class TeamsController {
    */
   static async createTeam(ctx: Context): Promise<void> {
     try {
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
       const { name, description } = ctx.request.body as any;
 
       if (!name || !name.trim()) {
-        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Team name is required');
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project name is required');
+      }
+      if (name.length < 4) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Name must be at least 4 characters long");
+      }
+      if (!description || !description.trim()) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project description is required');
+      }
+      if (description.length > 200) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Description is too long");
       }
 
       const team = await teamRepository.createTeam({
@@ -53,32 +57,29 @@ export class TeamsController {
    */
   static async listTeams(ctx: Context): Promise<void> {
     try {
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
-
-      const teams = await teamRepository.findByMember(userId);
-
-      const projectsByTeam = await Promise.all(
-        teams.map((team) => projectRepository.findByTeam(team._id))
-      );
+      const userId = ctx.state.auth!.user._id;
+      const page = parseInt(ctx.query.page as string) || 1;
+      const limit = parseInt(ctx.query.limit as string) || 10;
+      const { teams, total } = await teamRepository.findByMember(userId, { page, limit });
 
       ctx.body = {
-        teams: teams.map((team, idx) => ({
+        teams: teams.map(team => ({
           id: team._id,
           name: team.name,
           description: team.description,
           ownerId: team.ownerId,
           memberCount: team.members.length,
-          projectCount: projectsByTeam[idx]?.length || 0,
+          projectCount: team.projectCount,
           role: team.members.find((m) => m.userId.toString() === userId.toString())?.role,
           createdAt: team.createdAt,
           updatedAt: team.updatedAt,
         })),
-        total: teams.length,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        },
       };
     } catch (error) {
       logger.error('Failed to list teams:', error);
@@ -93,12 +94,7 @@ export class TeamsController {
   static async getTeam(ctx: Context): Promise<void> {
     try {
       const teamId = ctx.params.id;
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
 
       const team = await teamRepository.findByIdWithMembers(teamId);
 
@@ -119,24 +115,24 @@ export class TeamsController {
         description: team.description,
         ownerId: team.ownerId,
         members: team.members.map((member) => {
-          let userId, name, email;
+          let memberUserId, name, email;
           if (
             typeof member.userId === 'object' &&
             member.userId !== null &&
             'name' in member.userId &&
             'email' in member.userId
           ) {
-            userId = member.userId._id as mongoose.Types.ObjectId;
+            memberUserId = member.userId._id as mongoose.Types.ObjectId;
             name = member.userId.name as string;
             email = member.userId.email as string;
           } else {
-            userId = member.userId;
+            memberUserId = member.userId;
             name = undefined;
             email = undefined;
           }
 
           return {
-            userId,
+            memberUserId,
             name,
             email,
             role: member.role,
@@ -162,17 +158,12 @@ export class TeamsController {
   static async updateTeam(ctx: Context): Promise<void> {
     try {
       const teamId = ctx.params.id;
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
 
       const existingTeam = await teamRepository.findById(teamId);
       if (!existingTeam) {
         throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, 'Team not found');
       }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
       const { name, settings } = ctx.request.body as any;
 
       const userRole = await teamRepository.getMemberRole(teamId, userId);
@@ -182,8 +173,14 @@ export class TeamsController {
 
       const updateData: any = {};
       if (name !== undefined) updateData.name = name;
+
       type Plan = 'free' | 'pro' | 'enterprise' | 'custom';
       if (settings?.plan) {
+        const validPlans = ['free', 'pro', 'enterprise', 'custom'];
+        if (!validPlans.includes(settings.plan)) {
+          throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Invalid plan');
+        }
+
         const plan = settings.plan as Plan;
         const rateDefaults = rateLimiter.getDefaults();
         const quotaDefaults = quotaChecker.getDefaults();
@@ -231,12 +228,7 @@ export class TeamsController {
   static async deleteTeam(ctx: Context): Promise<void> {
     try {
       const teamId = ctx.params.id;
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
 
       const team = await teamRepository.findById(teamId);
       if (!team) {
@@ -247,6 +239,7 @@ export class TeamsController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 403, 'Only team owner can delete the team');
       }
 
+      await projectRepository.removeTeamFromProjects(teamId);
       await teamRepository.deleteTeam(teamId);
 
       ctx.body = {
@@ -267,12 +260,7 @@ export class TeamsController {
   static async addMember(ctx: Context): Promise<void> {
     try {
       const teamId = ctx.params.id;
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
       const { email, role } = ctx.request.body as any;
 
       const userRole = await teamRepository.getMemberRole(teamId, userId);
@@ -280,8 +268,16 @@ export class TeamsController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 403, 'Insufficient permissions');
       }
 
-      if (!email || !role) {
-        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Email and role are required');
+      const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!regex.test(email)) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid email format");
+      }
+
+      if (!email) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Email is required');
+      }
+      if (!role || !['admin', 'member'].includes(role)) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Role must be admin or member');
       }
 
       const newMember = await userRepository.findByEmail(email);
@@ -329,13 +325,7 @@ export class TeamsController {
       const memberId = ctx.params.memberId;
       const { role } = ctx.request.body as { role: 'admin' | 'member' };
 
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
 
       if (!role || !['admin', 'member'].includes(role)) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Invalid role');
@@ -351,7 +341,7 @@ export class TeamsController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Team not found');
       }
 
-      const selectedMember = team.members.find((m) => m.userId == memberId);
+      const selectedMember = team.members.find((m) => m.userId.toString() === memberId.toString());
       if (!selectedMember) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Selected member not found');
       }
@@ -396,12 +386,7 @@ export class TeamsController {
     try {
       const teamId = ctx.params.id;
       const memberId = ctx.params.memberId;
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
 
       const userRole = await teamRepository.getMemberRole(teamId, userId);
       if (!userRole || !['owner', 'admin'].includes(userRole)) {
@@ -413,7 +398,7 @@ export class TeamsController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Team not found');
       }
 
-      if (team.ownerId.toString() === memberId) {
+      if (team.ownerId.toString() === memberId.toString()) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Cannot remove team owner');
       }
 
@@ -441,12 +426,7 @@ export class TeamsController {
   static async assignProject(ctx: Context): Promise<void> {
     try {
       const teamId = ctx.params.id;
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
       const { projectId } = ctx.request.body as any;
 
       if (!projectId) {
@@ -490,12 +470,7 @@ export class TeamsController {
     try {
       const teamId = ctx.params.id;
       const projectId = ctx.params.projectId;
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
 
       const teamRole = await teamRepository.getMemberRole(teamId, userId);
       if (!teamRole || !['owner', 'admin'].includes(teamRole)) {
@@ -507,11 +482,11 @@ export class TeamsController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Project not found');
       }
 
-      if (!project.teamId || project.teamId.toString() !== teamId.toString()) {
+      if (!project.teamIds?.some(id => id.toString() === teamId.toString())) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project is not assigned to this team');
       }
 
-      await teamRepository.removeProject(projectId);
+      await teamRepository.removeProject(projectId, teamId);
 
       ctx.body = {
         message: 'Project removed from team',
@@ -532,12 +507,7 @@ export class TeamsController {
   static async getUsageStats(ctx: Context): Promise<void> {
     try {
       const teamId = ctx.params.id;
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
       const { startDate, endDate } = ctx.query;
 
       const isMember = await teamRepository.isMember(teamId, userId);

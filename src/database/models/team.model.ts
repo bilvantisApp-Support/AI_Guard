@@ -27,11 +27,13 @@ export interface ITeamUsageMetrics {
     cost: number;
   };
   currentMonth: {
+    month: string;
     requests: number;
     tokens: number;
     cost: number;
   };
   currentDay: {
+    date: Date;
     requests: number;
     tokens: number;
     cost: number;

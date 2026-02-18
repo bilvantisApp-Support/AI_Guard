@@ -13,3 +13,11 @@ export interface ProviderConfig {
   constantHeaders?: Record<string, string>; // Static headers to always add
   constantQueryParams?: Record<string, string>; // Static query params to always add
 }
+
+export interface ProviderSnippet {
+  provider?:string;
+  curl?: string;
+  node?: string;
+  python?: string;
+  java?: string;
+}

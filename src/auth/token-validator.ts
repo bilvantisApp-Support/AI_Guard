@@ -30,10 +30,14 @@ export class TokenValidator {
 
       // Import userRepository here to avoid circular dependency
       const { userRepository } = await import('../database/repositories/user.repository');
-      
+
       // Find or create user based on Firebase UID
       let user = await userRepository.findByFirebaseUid(decodedToken.uid);
-      
+
+      //Count the number of users
+      const existingUsersCount = await userRepository.countUsers();
+      const role = existingUsersCount == 0 ? 'owner' : 'member';
+
       if (!user) {
         // Create new user from Firebase data
         const firebaseUser = await firebaseAdmin.getUser(decodedToken.uid);
@@ -45,7 +49,7 @@ export class TokenValidator {
           firebaseUid: decodedToken.uid,
           email: firebaseUser.email || decodedToken.email || '',
           name: firebaseUser.displayName || decodedToken.name || 'Unknown User',
-          role: 'member',
+          role,
           status: 'active',
         });
       }
@@ -71,17 +75,17 @@ export class TokenValidator {
         logger.debug('Invalid PAT format');
         return null;
       }
-      
+
       // Find token by identifier
       const result = await tokenRepository.findByIdentifierWithUser(parsed.identifier);
-      
+
       if (!result) {
         logger.debug('PAT not found by identifier');
         return null;
       }
 
       const { token: patToken, user } = result;
-      
+
       // Compare the full token with stored hash
       const isValid = await this.compareToken(token, patToken.tokenHash);
       if (!isValid) {
@@ -122,7 +126,7 @@ export class TokenValidator {
         return patResult;
       }
     }
-    
+
     const firebaseResult = await this.validateFirebaseToken(token);
     if (firebaseResult) {
       return firebaseResult;
@@ -146,21 +150,21 @@ export class TokenValidator {
     const identifier = crypto.randomBytes(8).toString('hex'); // 16 char identifier
     const secret = crypto.randomBytes(24).toString('base64url'); // 32 char secret
     const fullToken = `pat_${identifier}_${secret}`;
-    
+
     return {
       fullToken,
       identifier: `pat_${identifier}`,
       secret
     };
   }
-  
+
   public static parseToken(token: string): { identifier: string; secret: string } | null {
     // Parse token format: pat_<identifier>_<secret>
     const match = token.match(/^(pat_[a-f0-9]{16})_(.+)$/);
     if (!match) {
       return null;
     }
-    
+
     return {
       identifier: match[1],
       secret: match[2]

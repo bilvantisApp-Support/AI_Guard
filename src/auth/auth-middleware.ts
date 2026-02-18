@@ -25,13 +25,13 @@ export class AuthMiddleware {
   public static requireAuth() {
     return async (ctx: Context, next: Next) => {
       const authHeader = ctx.headers.authorization;
-      
+
       if (!authHeader) {
         ctx.throw(401, 'Authorization header required');
       }
 
       const authResult = await TokenValidator.validateToken(authHeader);
-      
+
       if (!authResult) {
         ctx.throw(401, 'Invalid or expired token');
       }
@@ -57,13 +57,13 @@ export class AuthMiddleware {
   public static optionalAuth() {
     return async (ctx: Context, next: Next) => {
       const authHeader = ctx.headers.authorization;
-      
+
       if (authHeader) {
         const authResult = await TokenValidator.validateToken(authHeader);
-        
+
         if (authResult) {
           ctx.state.auth = authResult;
-          
+
           logger.info('User authenticated (optional)', {
             userId: authResult.user._id,
             authType: authResult.authType,
@@ -91,7 +91,7 @@ export class AuthMiddleware {
       }
 
       const projectId = ctx.params.projectId || ctx.query.projectId || ctx.state.auth.projectId;
-      
+
       if (!projectId) {
         ctx.throw(400, 'Project ID required');
       }
@@ -137,7 +137,7 @@ export class AuthMiddleware {
       }
 
       const hasScope = token.scopes.includes(scope) || token.scopes.includes('admin');
-      
+
       if (!hasScope) {
         ctx.throw(403, `Scope required: ${scope}`);
       }
@@ -155,9 +155,10 @@ export class AuthMiddleware {
         ctx.throw(401, 'Authentication required');
       }
 
-      // Check for admin secret key
-      const adminKey = ctx.headers['x-admin-key'];
-      if (adminKey === process.env.ADMIN_SECRET_KEY && process.env.ADMIN_SECRET_KEY) {
+      // Check for admin access
+      const role = ctx.state.auth.user.role;
+
+      if (role === 'owner' || role === 'admin') {
         ctx.state.auth.permissions = ['admin:all'];
         await next();
         return;

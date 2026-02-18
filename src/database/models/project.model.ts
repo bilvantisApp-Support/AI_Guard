@@ -51,9 +51,9 @@ export interface IUsageMetrics {
 export interface IProject extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
-  description:string;
+  description: string;
   ownerId: mongoose.Types.ObjectId;
-  teamId?: mongoose.Types.ObjectId;
+  teamIds?: mongoose.Types.ObjectId[];
   members: IProjectMember[];
   apiKeys: IProviderApiKey[];
   settings: IProjectSettings;
@@ -126,13 +126,15 @@ const projectSchema = new Schema<IProject>(
       ref: 'User',
       required: true,
     },
-    description:{
-      type:String,
+    description: {
+      type: String,
     },
-    teamId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Team',
-    },
+    teamIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Team',
+      }
+    ],
     members: [projectMemberSchema],
     apiKeys: [providerApiKeySchema],
     settings: {
@@ -180,6 +182,6 @@ const projectSchema = new Schema<IProject>(
 projectSchema.index({ ownerId: 1 });
 projectSchema.index({ 'members.userId': 1 });
 projectSchema.index({ name: 1 });
-projectSchema.index({ teamId: 1 });
+projectSchema.index({ teamIds: 1 });
 
 export const Project = mongoose.model<IProject>('Project', projectSchema);

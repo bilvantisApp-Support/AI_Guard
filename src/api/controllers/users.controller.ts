@@ -6,6 +6,11 @@ import { ScopeValidator } from '../../auth/pat/pat-scopes';
 import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
 import { projectRepository } from '../../database/repositories';
+import { providerSnippetRepository } from '../../database/repositories/provider-snippet.repository';
+import { patCreatedTemplate } from '../../services/mail/templates/pat-created.template';
+import { mailService } from '../../services/mail/mail.service';
+import { firebaseAdmin } from '../../auth';
+import { forgotPasswordTemplate } from '../../services/mail/templates/forgot-password.template';
 
 export class UsersController {
   /**
@@ -170,6 +175,9 @@ export class UsersController {
       if (!name) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Token name is required');
       }
+      if (typeof name !== "string") {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Name must be a string");
+      }
 
       if (!scopes || !Array.isArray(scopes) || scopes.length === 0) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'At least one scope is required');
@@ -220,6 +228,28 @@ export class UsersController {
         expiresInDays,
       });
 
+      const snippets = await providerSnippetRepository.getProviderSnippet(llmProvider);
+      if (!snippets) {
+        throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, 'Provider snippets not found');
+      }
+
+      const user = await userRepository.findById(userId);
+
+      if (!user) {
+        throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, 'User not found');
+      }
+      // Enable sending OTP once the email service is ready
+      const SENT_MAIL = false;
+
+      if (user && SENT_MAIL) {
+        const html = patCreatedTemplate(user.name, token, snippets);
+        await mailService.sendMail(
+          user.email,
+          "Your AI Guard PAT Token",
+          html
+        );
+      }
+
       ctx.body = {
         id: tokenRecord._id,
         name: tokenRecord.name,
@@ -243,12 +273,7 @@ export class UsersController {
    */
   static async listTokens(ctx: Context): Promise<void> {
     try {
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
       const includeRevoked = ctx.query.includeRevoked === 'true';
 
       const tokens = await tokenRepository.findByUserId(userId, includeRevoked);
@@ -278,12 +303,7 @@ export class UsersController {
    */
   static async revokeToken(ctx: Context): Promise<void> {
     try {
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
       const tokenId = ctx.params.tokenId;
 
       // Check if token belongs to user
@@ -315,12 +335,7 @@ export class UsersController {
    */
   static async rotateToken(ctx: Context): Promise<void> {
     try {
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id.toString();
+      const userId = ctx.state.auth!.user._id.toString();
       const tokenId = ctx.params.tokenId;
 
       const result = await PatGenerator.rotateToken(tokenId, userId);
@@ -353,12 +368,7 @@ export class UsersController {
    */
   static async getUsageSummary(ctx: Context): Promise<void> {
     try {
-      if (!ctx.state.auth) {
-        ctx.status = 401;
-        ctx.body = { error: 'Authentication required' };
-        return;
-      }
-      const userId = ctx.state.auth.user._id;
+      const userId = ctx.state.auth!.user._id;
       const { startDate, endDate } = ctx.query;
 
       const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
@@ -381,6 +391,53 @@ export class UsersController {
       };
     } catch (error) {
       logger.error('Failed to get usage summary:', error);
+      throw error;
+    }
+  }
+
+  /**
+ * Forgot Password
+ * POST /_api/users/forgot-password
+ */
+  static async forgotPassword(ctx: Context): Promise<void> {
+
+    try {
+      const { email } = ctx.request.body as { email: string };
+
+      const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!regex.test(email)) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid email format");
+      }
+
+      if (!email || !email.trim()) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Email is required");
+      }
+
+      const user = await userRepository.findByEmail(email);
+      // Check user exist
+      if (!user) {
+        throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, "User not found");
+      }
+
+      // Generate Firebase reset link
+      const resetLink = await firebaseAdmin.generatePasswordResetLink(email);
+      if (!resetLink) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Failed to generate reset link");
+      }
+
+      const html = forgotPasswordTemplate(user.name, resetLink);
+      await mailService.sendMail(
+        user.email,
+        "Reset Your Password",
+        html
+      );
+      ctx.body = {
+        message: "Password reset email sent"
+      };
+
+    }
+    catch (error) {
+      logger.error("Forgot password error:", error);
       throw error;
     }
   }

@@ -8,6 +8,11 @@ export interface CreateTeamDto {
   ownerId: mongoose.Types.ObjectId;
 }
 
+export interface ITeamDto extends ITeam {
+  projectCount: number;
+}
+
+
 export interface UpdateTeamDto {
   name?: string;
   settings?: {
@@ -57,9 +62,38 @@ export class TeamRepository {
       .exec();
   }
 
-  async findByMember(userId: string | mongoose.Types.ObjectId): Promise<ITeam[]> {
-    return await Team.find({ 'members.userId': userId }).exec();
+  async findByMember(userId: string | mongoose.Types.ObjectId, pagination: { page?: number; limit?: number }): Promise<{ teams: ITeamDto[]; total: number }> {
+    const page = pagination.page || 1;
+    const limit = pagination.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const userObjectId = { 'members.userId': new mongoose.Types.ObjectId(userId) }
+    const teams = await Team.aggregate([
+      {
+        $match: userObjectId
+      },
+      {
+        $lookup: {
+          from: 'projects',
+          localField: '_id',
+          foreignField: 'teamIds',
+          as: 'projects'
+        }
+      },
+      {
+        $addFields: {
+          projectCount: { $size: '$projects' }
+        }
+      },
+      { $skip: skip },
+      { $limit: limit },
+    ]);
+
+    const total = await Team.countDocuments(userObjectId);
+
+    return { teams, total };
   }
+
 
   async updateTeam(
     teamId: string | mongoose.Types.ObjectId,
@@ -151,19 +185,24 @@ export class TeamRepository {
     teamId: string | mongoose.Types.ObjectId,
     projectId: string | mongoose.Types.ObjectId
   ): Promise<void> {
-    await Project.findByIdAndUpdate(projectId, { $set: { teamId } }).exec();
+    await Project.findByIdAndUpdate(projectId, { $addToSet: { teamIds: teamId } }).exec();
   }
 
   async removeProject(
+    teamId: string | mongoose.Types.ObjectId,
     projectId: string | mongoose.Types.ObjectId
   ): Promise<void> {
-    await Project.findByIdAndUpdate(projectId, { $unset: { teamId: 1 } }).exec();
+    await Project.findByIdAndUpdate(
+      projectId,
+      { $pull: { teamIds: teamId } }
+    ).exec();
   }
+
 
   async listProjects(
     teamId: string | mongoose.Types.ObjectId
   ): Promise<{ id: string; name: string; ownerId: mongoose.Types.ObjectId }[]> {
-    const projects = await Project.find({ teamId })
+    const projects = await Project.find({ teamIds: teamId })
       .select({ _id: 1, name: 1, ownerId: 1 })
       .exec();
     return projects.map((p) => ({
@@ -181,10 +220,36 @@ export class TeamRepository {
       cost?: number;
     }
   ): Promise<void> {
-    const increments: any = {};
+    const team = await Team.findById(teamId);
+
+    if (!team) return;
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const currentMonth = today.slice(0, 7);
+
     const sets: any = {
-      'usage.lastUpdated': new Date(),
+      'usage.lastUpdated': now
     };
+
+    if (!team.usage.currentDay?.date || team.usage.currentDay?.date.toISOString().split('T')[0] !== today) {
+      sets['usage.currentDay'] = {
+        date: now,
+        requests: 0,
+        tokens: 0,
+        cost: 0
+      };
+    }
+
+    if (!team.usage.currentMonth?.month || team.usage.currentMonth.month !== currentMonth) {
+      sets['usage.currentMonth'] = {
+        month: currentMonth,
+        requests: 0,
+        tokens: 0,
+        cost: 0
+      };
+    }
+
+    const increments: any = {};
 
     if (usage.requests !== undefined) {
       increments['usage.total.requests'] = usage.requests;

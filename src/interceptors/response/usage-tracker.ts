@@ -4,6 +4,7 @@ import { projectRepository } from '../../database/repositories/project.repositor
 import { teamRepository } from '../../database/repositories/team.repository';
 import { logger } from '../../utils/logger';
 import mongoose from 'mongoose';
+import Redis from 'ioredis';
 
 export interface UsageData {
   provider: string;
@@ -20,6 +21,32 @@ export interface UsageData {
 }
 
 export class UsageTracker {
+
+  private redis: Redis | null = null;
+
+  constructor() {
+    this.initializeRedis();
+  }
+
+  private initializeRedis(): void {
+      try {
+        const redisUrl = process.env.REDIS_URL;
+        if (redisUrl) {
+          this.redis = new Redis(redisUrl);
+          this.redis.on('connect', () => {
+            logger.info('Redis connected for usage tracker');
+          });
+          this.redis.on('error', (error) => {
+            logger.error('Redis connection error:', error);
+          });
+        } else {
+          logger.info('Redis URL not configured');
+        }
+      } catch (error) {
+        logger.error('Failed to initialize Redis:', error);
+      }
+    }
+
   /**
    * Create usage tracking middleware
    */
@@ -126,7 +153,7 @@ export class UsageTracker {
         // Gemini model is in the path
         const modelMatch = ctx.path.match(/models\/([^\/]+)/);
         usageData.model = modelMatch ? modelMatch[1] : undefined;
-        
+
         if (responseBody && typeof responseBody === 'object' && 'usageMetadata' in responseBody) {
           const usageMetadata = responseBody.usageMetadata as any;
           usageData.promptTokens = usageMetadata.promptTokenCount;
@@ -210,18 +237,38 @@ export class UsageTracker {
    * - the user is a member of that team
    */
   private async resolveTeamId(userId: string, projectId: string): Promise<string | undefined> {
+    const cacheKey = `team:${userId}:${projectId}`;
     try {
+      if (this.redis) {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) {
+          return cached === 'null' ? undefined : cached;
+        }
+      }
       const project = await projectRepository.findById(projectId);
-      if (!project?.teamId) {
+      if (!project?.teamIds?.length) {
+        if (this.redis) {
+          await this.redis.set(cacheKey, 'null', 'EX', 900);
+        }
         return undefined;
       }
 
-      const isMember = await teamRepository.isMember(project.teamId, userId);
-      if (!isMember) {
-        return undefined;
+      for (const teamId of project.teamIds) {
+        const isMember = await teamRepository.isMember(teamId, userId);
+        if (isMember) {
+          const result = teamId.toString();
+          if (this.redis) {
+            await this.redis.set(cacheKey, result, 'EX', 900);
+          }
+          return result;
+        }
+      }
+      if (this.redis) {
+        await this.redis.set(cacheKey, 'null', 'EX', 900);
       }
 
-      return project.teamId.toString();
+      return undefined;
+
     } catch (error) {
       logger.error('Failed to resolve team for usage:', error);
       return undefined;
@@ -353,7 +400,7 @@ export class UsageTracker {
           totalCost: 0,
           byProvider: {},
           byModel: {},
-          byUser:{}
+          byUser: {}
         };
       }
 
@@ -362,7 +409,7 @@ export class UsageTracker {
       // Process provider and model breakdowns
       const byProvider = this.aggregateBy(result.byProvider, 'provider');
       const byModel = this.aggregateBy(result.byModel, 'model');
-      const byUser = this.aggregateBy(result.byUser,'userId')
+      const byUser = this.aggregateBy(result.byUser, 'userId');
 
       return {
         totalRequests: result.totalRequests,

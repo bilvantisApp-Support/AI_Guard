@@ -6,6 +6,7 @@ const router = new Router();
 
 // All dashboard routes require authentication
 router.use(AuthMiddleware.requireAuth());
+router.use(AuthMiddleware.requireAdmin());
 
 router.get('/stats', DashboardController.getStats);
 router.get('/activity', DashboardController.getRecentActivity);
