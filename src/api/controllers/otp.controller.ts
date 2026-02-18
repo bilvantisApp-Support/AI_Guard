@@ -59,6 +59,7 @@ export class OTPController {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid or expired OTP");
             }
 
+            ctx.state.otpVerified = true;
             ctx.body = {
                 success: true,
                 valid: true,
