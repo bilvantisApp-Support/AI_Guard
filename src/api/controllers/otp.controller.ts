@@ -30,6 +30,7 @@ export class OTPController {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "name is required");
             }
 
+            await otpService.sendOTP(email,name);
             ctx.body = {
                 success: true,
                 message: "OTP sent successfully"
