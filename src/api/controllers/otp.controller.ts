@@ -52,9 +52,6 @@ export class OTPController {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid input types");
             }
 
-            if (!email || !otp) {
-                throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Email and OTP required");
-            }
             const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
             if (!regex.test(email)) {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid email format");
