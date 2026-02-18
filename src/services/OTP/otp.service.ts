@@ -60,7 +60,7 @@ class OTPService {
         logger.info(`OTP sent to ${email}`);
     }
 
-    async verifyOTP(email: string,otp: string): Promise<boolean> {
+    async verifyOTP(email: string,otp: number): Promise<boolean> {
         if (!this.redis) {
             return false;
         }
@@ -71,7 +71,7 @@ class OTPService {
         if (!storedOTP) {
             return false;
         }
-        if (storedOTP !== otp) {
+        if (storedOTP !== String(otp)) {
             return false;
         }
         await this.redis.del(key);
