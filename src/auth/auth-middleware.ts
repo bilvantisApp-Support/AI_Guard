@@ -25,12 +25,13 @@ export class AuthMiddleware {
   public static requireAuth() {
     return async (ctx: Context, next: Next) => {
       const authHeader = ctx.headers.authorization;
+      const captchaToken = ctx.headers['x-captcha-token'] as string;
 
       if (!authHeader) {
         ctx.throw(401, 'Authorization header required');
       }
 
-      const authResult = await TokenValidator.validateToken(authHeader);
+      const authResult = await TokenValidator.validateToken(authHeader, captchaToken);
 
       if (!authResult) {
         ctx.throw(401, 'Invalid or expired token');

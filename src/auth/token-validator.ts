@@ -4,6 +4,7 @@ import { tokenRepository } from '../database/repositories/token.repository';
 import { IUser } from '../database/models/user.model';
 import { IPersonalAccessToken } from '../database/models/token.model';
 import { logger } from '../utils/logger';
+import { captchaService } from '../services/captcha/captcha.service';
 
 export interface AuthResult {
   user: IUser;
@@ -21,7 +22,7 @@ export class TokenValidator {
     return authHeader.substring(this.BEARER_PREFIX.length);
   }
 
-  public static async validateFirebaseToken(token: string): Promise<AuthResult | null> {
+  public static async validateFirebaseToken(token: string, captchaToken?: string): Promise<AuthResult | null> {
     try {
       const decodedToken = await firebaseAdmin.verifyIdToken(token);
       if (!decodedToken) {
@@ -34,16 +35,29 @@ export class TokenValidator {
       // Find or create user based on Firebase UID
       let user = await userRepository.findByFirebaseUid(decodedToken.uid);
 
-      //Count the number of users
-      const existingUsersCount = await userRepository.countUsers();
-      const role = existingUsersCount == 0 ? 'owner' : 'member';
 
       if (!user) {
+
+        //Check Captcha Token
+        if (!captchaToken) {
+          logger.error("Captcha token missing for new user");
+          return null;
+        }
+        const validCaptchaToken = await captchaService.verifyTurnstileToken(captchaToken);
+        if (!validCaptchaToken) {
+          logger.warn("Invalid captcha token");
+          return null;
+        }
+
         // Create new user from Firebase data
         const firebaseUser = await firebaseAdmin.getUser(decodedToken.uid);
         if (!firebaseUser) {
           return null;
         }
+
+        //Count the number of users
+        const existingUsersCount = await userRepository.countUsers();
+        const role = existingUsersCount == 0 ? 'owner' : 'member';
 
         user = await userRepository.createUser({
           firebaseUid: decodedToken.uid,
@@ -113,7 +127,7 @@ export class TokenValidator {
     }
   }
 
-  public static async validateToken(authHeader: string | undefined): Promise<AuthResult | null> {
+  public static async validateToken(authHeader: string | undefined, captchaToken?: string): Promise<AuthResult | null> {
     const token = this.extractToken(authHeader);
     if (!token) {
       return null;
@@ -127,7 +141,7 @@ export class TokenValidator {
       }
     }
 
-    const firebaseResult = await this.validateFirebaseToken(token);
+    const firebaseResult = await this.validateFirebaseToken(token, captchaToken);
     if (firebaseResult) {
       return firebaseResult;
     }
