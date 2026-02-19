@@ -39,13 +39,14 @@ export class TokenValidator {
       if (!user) {
 
         //Check Captcha Token
-        if (!captchaToken) {
-          logger.error("Captcha token missing for new user");
+        if (typeof captchaToken !== 'string') {
+          logger.error("Invalid captcha token");
           return null;
         }
+
         const validCaptchaToken = await captchaService.verifyTurnstileToken(captchaToken);
         if (!validCaptchaToken) {
-          logger.warn("Invalid captcha token");
+          logger.warn("Captcha token missing for new user");
           return null;
         }
 
