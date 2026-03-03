@@ -46,9 +46,9 @@ export class OTPController {
     */
     static async verifyOTP(ctx: Context): Promise<void> {
         try {
-            const { email, otp } = ctx.request.body as { email: string; otp: number; };
+            const { email, otp } = ctx.request.body as { email: string; otp: string | number ; };
 
-            if (typeof email !== 'string' || typeof otp !== 'number') {
+            if (typeof email !== 'string' || (typeof otp !== 'string' && typeof otp !== 'number')) {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid input types");
             }
 
@@ -57,10 +57,12 @@ export class OTPController {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid email format");
             }
 
+            const OTP = String(otp).trim();
+
             if (!/^[0-9]{6}$/.test(String(otp))) {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid OTP format");
             }
-            const valid = await otpService.verifyOTP(email, otp);
+            const valid = await otpService.verifyOTP(email, OTP);
 
             if (!valid) {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid or expired OTP");

@@ -73,12 +73,22 @@ export class UsageTracker {
       if (!auth?.user || !provider) {
         return; // Skip tracking if no auth or provider
       }
+      const projectId = (auth.token as any)?._doc?.projectId?.toString();
+
+      if (!projectId) {
+        logger.debug('Skipping usage record: no projectId');
+        return;
+      }
 
       const usageData = this.extractUsageData(ctx, provider, responseTime);
-      const projectId = (auth.token as any)?._doc?.projectId?.toString();
       const teamId = projectId
         ? await this.resolveTeamId(auth.user._id.toString(), projectId)
         : undefined;
+
+      if (!teamId) {
+        logger.debug('Skipping usgae record: no teamId');
+        return
+      }
 
       // Save detailed usage record
       await this.saveUsageRecord(

@@ -20,7 +20,11 @@ export class BrevoService {
             logger.info("Brevo SMTP already initialized");
             return;
         }
+        const { BREVO_SMTP_HOST, BREVO_SMTP_PORT, BREVO_SMTP_USER, BREVO_SMTP_PASS, FROM_MAIL } = process.env;
 
+        if (!BREVO_SMTP_HOST || !BREVO_SMTP_PORT || !BREVO_SMTP_USER || !BREVO_SMTP_PASS || !FROM_MAIL) {
+            throw new Error("Missing required Brevo SMTP configuration");
+        }
         try {
             this.transporter = nodemailer.createTransport({
                 host: process.env.BREVO_SMTP_HOST,
@@ -49,10 +53,10 @@ export class BrevoService {
             logger.warn("Brevo SMTP not initialized");
             return;
         }
-
+        const fromMail = process.env.FROM_MAIL;
         try {
             const response = await this.transporter.sendMail({
-                from: `"AI Guard" ${process.env.FROM_MAIL}`,
+                from: `"AI Guard" <${fromMail}>`,
                 to,
                 subject,
                 html

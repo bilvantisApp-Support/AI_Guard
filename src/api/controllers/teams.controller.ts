@@ -20,13 +20,13 @@ export class TeamsController {
       const { name, description } = ctx.request.body as any;
 
       if (!name || !name.trim()) {
-        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project name is required');
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Team name is required');
       }
       if (name.length < 4) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Name must be at least 4 characters long");
       }
       if (!description || !description.trim()) {
-        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project description is required');
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Team description is required');
       }
       if (description.length > 200) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Description is too long");
@@ -486,7 +486,7 @@ export class TeamsController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project is not assigned to this team');
       }
 
-      await teamRepository.removeProject(projectId, teamId);
+      await teamRepository.removeProject(teamId, projectId);
 
       ctx.body = {
         message: 'Project removed from team',

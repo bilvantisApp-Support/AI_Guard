@@ -24,7 +24,7 @@ class CaptchaService {
     }
 
 
-    public async verifyTurnstileToken(captchaToken: string, remoteIp?: string) {
+    public async verifyTurnstileToken(captchaToken: string, remoteIp?: string): Promise<boolean> {
         if (!captchaToken) {
             logger.warn("Captcha validation failed: token missing");
             return false;
@@ -39,7 +39,7 @@ class CaptchaService {
 
             if(!data.success){
                 logger.error("Captcha verification failed",{error: data["error-codes"]});
-                return;
+                return false;
             }
             logger.info("Captcha verification successful");
             return true;

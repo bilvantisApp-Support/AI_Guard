@@ -22,7 +22,7 @@ export class ProviderSnippetController {
 
         //Checks valid provider
         if (!provider || !["openai", "anthropic", "gemini"].includes(provider)) {
-            throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 403, "Invalid provider");
+            throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid provider");
         }
 
         const existing = await providerSnippetRepository.getProviderSnippet(provider);

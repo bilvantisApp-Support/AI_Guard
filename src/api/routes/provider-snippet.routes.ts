@@ -10,5 +10,6 @@ router.post("/", ProviderSnippetController.createProviderSnippet);
 router.put("/:id", ProviderSnippetController.updateProviderSnippet);
 router.get("/",ProviderSnippetController.getAllProviderSnippets);
 router.get("/:provider",ProviderSnippetController.getProviderSnippet);
+router.delete("/:id", ProviderSnippetController.deleteProviderSnippet);
 
 export { router as providerSnippetRouter };

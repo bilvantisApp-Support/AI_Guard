@@ -71,11 +71,11 @@ class OTPService {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 429, `Please wait ${remainTime} seconds before requesting a new OTP`)
             }
 
-            resendCount = data.resetCount ?? 1;
+            resendCount = data.resendCount ?? 1;
             resendWindowMs = data.resendWindowMs ?? Date.now();
 
             const windowElapsed = (Date.now() - resendWindowMs) / 1000;
-            if(windowElapsed < this.WINDOW_TIME && resendCount > this.MAX_RESEND){
+            if(windowElapsed < this.WINDOW_TIME && resendCount >= this.MAX_RESEND){
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 429, 'Resend limit exceed');
             }
 
@@ -100,7 +100,7 @@ class OTPService {
         logger.info(`OTP sent to ${email}`);
     }
 
-    async verifyOTP(email: string, otp: number): Promise<boolean> {
+    async verifyOTP(email: string, otp: number | string): Promise<boolean> {
         if (!this.redis) {
             return false;
         }
