@@ -404,6 +404,10 @@ export class UsersController {
     try {
       const { email } = ctx.request.body as { email: string };
 
+      if (!email.toLowerCase().endsWith('@bilvantis.io')) {
+        throw new Error('Only Bilvantis email addresses are allowed');
+      }
+      
       const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
       if (!regex.test(email)) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid email format");
