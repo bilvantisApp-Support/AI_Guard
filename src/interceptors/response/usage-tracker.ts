@@ -37,7 +37,7 @@ export class UsageTracker {
             logger.info('Redis connected for usage tracker');
           });
           this.redis.on('error', (error) => {
-            logger.error('Redis connection error:', error);
+            logger.error('Redis usage tracker connection error:', error);
           });
         } else {
           logger.info('Redis URL not configured');

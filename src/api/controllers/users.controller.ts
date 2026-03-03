@@ -8,9 +8,9 @@ import { ProxyError, ProxyErrorType } from '../../types/proxy';
 import { projectRepository } from '../../database/repositories';
 import { providerSnippetRepository } from '../../database/repositories/provider-snippet.repository';
 import { patCreatedTemplate } from '../../services/mail/templates/pat-created.template';
-import { mailService } from '../../services/mail/mail.service';
 import { firebaseAdmin } from '../../auth';
 import { forgotPasswordTemplate } from '../../services/mail/templates/forgot-password.template';
+import { brevoService } from '../../services/mail/mail.service';
 
 export class UsersController {
   /**
@@ -239,11 +239,11 @@ export class UsersController {
         throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, 'User not found');
       }
       // Enable sending OTP once the email service is ready
-      const SENT_MAIL = false;
+      const SENT_MAIL = true;
 
       if (user && SENT_MAIL) {
         const html = patCreatedTemplate(user.name, token, snippets);
-        await mailService.sendMail(
+        await brevoService.sendMail(
           user.email,
           "Your AI Guard PAT Token",
           html
@@ -426,7 +426,7 @@ export class UsersController {
       }
 
       const html = forgotPasswordTemplate(user.name, resetLink);
-      await mailService.sendMail(
+      await brevoService.sendMail(
         user.email,
         "Reset Your Password",
         html

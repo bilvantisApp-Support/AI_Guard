@@ -36,11 +36,13 @@ export interface IUsageMetrics {
     cost: number;
   };
   currentMonth: {
+    month: string;
     requests: number;
     tokens: number;
     cost: number;
   };
   currentDay: {
+    date: string;
     requests: number;
     tokens: number;
     cost: number;
@@ -161,11 +163,13 @@ const projectSchema = new Schema<IProject>(
         cost: { type: Number, default: 0 },
       },
       currentMonth: {
+        month: { type: String, default: new Date().toISOString().slice(0, 7) },
         requests: { type: Number, default: 0 },
         tokens: { type: Number, default: 0 },
         cost: { type: Number, default: 0 },
       },
       currentDay: {
+        date: { type: String, default: new Date().toISOString().slice(0, 10) },
         requests: { type: Number, default: 0 },
         tokens: { type: Number, default: 0 },
         cost: { type: Number, default: 0 },

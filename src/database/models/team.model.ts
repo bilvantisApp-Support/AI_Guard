@@ -33,7 +33,7 @@ export interface ITeamUsageMetrics {
     cost: number;
   };
   currentDay: {
-    date: Date;
+    date: string;
     requests: number;
     tokens: number;
     cost: number;
@@ -113,11 +113,13 @@ const teamSchema = new Schema<ITeam>(
         cost: { type: Number, default: 0 },
       },
       currentMonth: {
+        month: { type: String, default: () => new Date().toISOString().slice(0, 7) },
         requests: { type: Number, default: 0 },
         tokens: { type: Number, default: 0 },
         cost: { type: Number, default: 0 },
       },
       currentDay: {
+        date: { type: String, default: () => new Date().toISOString().slice(0,10) },
         requests: { type: Number, default: 0 },
         tokens: { type: Number, default: 0 },
         cost: { type: Number, default: 0 },

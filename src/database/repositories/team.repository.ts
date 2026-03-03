@@ -220,36 +220,10 @@ export class TeamRepository {
       cost?: number;
     }
   ): Promise<void> {
-    const team = await Team.findById(teamId);
-
-    if (!team) return;
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const currentMonth = today.slice(0, 7);
-
-    const sets: any = {
-      'usage.lastUpdated': now
-    };
-
-    if (!team.usage.currentDay?.date || team.usage.currentDay?.date.toISOString().split('T')[0] !== today) {
-      sets['usage.currentDay'] = {
-        date: now,
-        requests: 0,
-        tokens: 0,
-        cost: 0
-      };
-    }
-
-    if (!team.usage.currentMonth?.month || team.usage.currentMonth.month !== currentMonth) {
-      sets['usage.currentMonth'] = {
-        month: currentMonth,
-        requests: 0,
-        tokens: 0,
-        cost: 0
-      };
-    }
-
     const increments: any = {};
+    const sets: any = {
+      'usage.lastUpdated': new Date(),
+    };
 
     if (usage.requests !== undefined) {
       increments['usage.total.requests'] = usage.requests;
