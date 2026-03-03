@@ -98,7 +98,7 @@ export class FirebaseAdmin {
     }
     try {
       const link = await admin.auth().generatePasswordResetLink(email, {
-        url: `${process.env.FRONTEND_URL}/reset-password`
+        url: `${process.env.FRONTEND_URL}/reset-password`, handleCodeInApp: true
       });
       return link;
     } catch (error) {
