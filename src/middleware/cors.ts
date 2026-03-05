@@ -23,6 +23,7 @@ export const corsMiddleware = cors({
     'Authorization',
     'X-AI-Guard-Provider',
     'X-Request-ID',
+    'x-captcha-token'
   ],
   exposeHeaders: [
     'X-Request-ID',

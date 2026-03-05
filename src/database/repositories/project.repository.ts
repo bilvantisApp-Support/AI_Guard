@@ -51,7 +51,7 @@ export class ProjectRepository {
   async findById(projectId: string | mongoose.Types.ObjectId): Promise<IProject | null> {
     return await Project.findById(projectId).exec();
   }
-  
+
   async findByIdWithMembers(projectId: String | mongoose.Types.ObjectId): Promise<IProject | null> {
     return await Project.findById(projectId).populate({
       path: 'members.userId',
@@ -64,8 +64,22 @@ export class ProjectRepository {
     return await Project.find({ ownerId }).exec();
   }
 
-  async findByMember(userId: string | mongoose.Types.ObjectId): Promise<IProject[]> {
-    return await Project.find({ 'members.userId': userId }).exec();
+  async findByMember(userId: string | mongoose.Types.ObjectId, pagination: { page?: number, limit?: number }): Promise<{ projects: IProject[]; total: number }> {
+    const query: any = { 'members.userId': userId }
+    const page = pagination.page || 1;
+    const limit = pagination.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [projects, total] = await Promise.all([
+      Project.find(query).skip(skip).limit(limit).exec(),
+      Project.countDocuments(query).exec()
+    ]);
+
+    return { projects, total };
+  }
+
+  async findByTeam(teamId: string | mongoose.Types.ObjectId): Promise<IProject[]> {
+    return await Project.find({ teamIds: teamId }).exec();
   }
 
   async updateProject(
@@ -215,6 +229,26 @@ export class ProjectRepository {
     );
 
     return member?.role || null;
+  }
+
+  async assignTeam(
+    projectId: string | mongoose.Types.ObjectId,
+    teamId: string | mongoose.Types.ObjectId
+  ): Promise<IProject | null> {
+    return await Project.findByIdAndUpdate(
+      projectId,
+      { $addToSet: { teamIds: teamId } },
+      { new: true }
+    ).exec();
+  }
+
+  async removeTeamFromProjects(
+    teamId: string | mongoose.Types.ObjectId
+  ): Promise<void> {
+    await Project.updateMany(
+      { teamIds: teamId },
+      { $pull: { teamIds: teamId } },
+    ).exec();
   }
 
   async updateUsage(

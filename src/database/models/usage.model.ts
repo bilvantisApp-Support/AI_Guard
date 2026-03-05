@@ -4,6 +4,7 @@ export interface IUsageRecord extends Document {
   _id: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
   projectId: mongoose.Types.ObjectId;
+  teamId?: mongoose.Types.ObjectId;
   provider: 'openai' | 'anthropic' | 'gemini';
   endpoint: string;
   method: string;
@@ -29,6 +30,10 @@ const usageRecordSchema = new Schema<IUsageRecord>(
       type: Schema.Types.ObjectId,
       ref: 'Project',
       required: true,
+    },
+    teamId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Team',
     },
     provider: {
       type: String,
@@ -82,6 +87,7 @@ const usageRecordSchema = new Schema<IUsageRecord>(
 // Indexes
 usageRecordSchema.index({ userId: 1 });
 usageRecordSchema.index({ projectId: 1 });
+usageRecordSchema.index({ teamId: 1 });
 usageRecordSchema.index({ provider: 1 });
 usageRecordSchema.index({ timestamp: -1 });
 

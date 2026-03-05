@@ -6,6 +6,7 @@ const router = new Router();
 
 // All analytics routes require authentication
 router.use(AuthMiddleware.requireAuth());
+router.use(AuthMiddleware.requireAdmin());
 
 router.get('/', async ctx => {
   await analyticsController.getAnalytics(ctx);

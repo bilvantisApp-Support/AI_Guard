@@ -57,6 +57,7 @@ export class AdminController {
           id: user._id,
           email: user.email,
           name: user.name,
+          role: user.role,
           status: user.status,
           createdAt: user.createdAt,
           lastLoginAt: user.lastLoginAt,
@@ -81,14 +82,24 @@ export class AdminController {
   static async updateUser(ctx: Context): Promise<void> {
     try {
       const userId = ctx.params.id;
-      const { status } = ctx.request.body as any;
+      const { status, role } = ctx.request.body as {
+        status: 'active' | 'suspended' | 'deleted';
+        role: 'owner' | 'admin' | 'member';
+      };
 
-      if (!status || !['active', 'suspended', 'deleted'].includes(status)) {
+      if (status && !['active', 'suspended', 'deleted'].includes(status)) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Valid status is required');
       }
+      if (role && !['owner', 'admin', 'member'].includes(role)) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Valid role is required');
+      }
 
-      const updatedUser = await userRepository.updateUser(userId, { status });
-      
+      if(!status && !role){
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Please provide status or role to update the user")
+      }
+
+      const updatedUser = await userRepository.updateUser(userId, { status, role });
+
       if (!updatedUser) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'User not found');
       }
@@ -96,6 +107,7 @@ export class AdminController {
       ctx.body = {
         id: updatedUser._id,
         email: updatedUser.email,
+        role: updatedUser.role,
         name: updatedUser.name,
         status: updatedUser.status,
         updatedAt: updatedUser.updatedAt,
@@ -187,7 +199,7 @@ export class AdminController {
   static async resetUserLimits(ctx: Context): Promise<void> {
     try {
       const userId = ctx.params.id;
-      
+
       // Reset rate limits
       await rateLimiter.resetLimit(`ratelimit:user:${userId}`);
 

@@ -25,6 +25,10 @@ export class QuotaChecker {
     enterprise: { monthlyLimit: 1000000, dailyLimit: 50000 },
   };
 
+  public getDefaults(): Record<'free' | 'pro' | 'enterprise', QuotaLimits> {
+    return { ...this.defaultQuotas }
+  }
+
   /**
    * Create quota checking middleware
    */
@@ -40,7 +44,7 @@ export class QuotaChecker {
       }
 
       const quotaStatus = await this.checkQuota(project);
-      
+
       // Set quota headers
       ctx.set('X-Quota-Monthly-Limit', String(quotaStatus.monthlyLimit));
       ctx.set('X-Quota-Monthly-Used', String(quotaStatus.monthlyUsage));
@@ -97,7 +101,7 @@ export class QuotaChecker {
    */
   public async checkQuota(project: IProject): Promise<QuotaStatus> {
     const quotaLimits = this.getQuotaLimits(project);
-    
+
     return {
       monthlyUsage: project.usage.currentMonth.requests,
       monthlyLimit: quotaLimits.monthlyLimit,
@@ -128,15 +132,15 @@ export class QuotaChecker {
   private determineProjectTier(project: IProject): 'free' | 'pro' | 'enterprise' {
     // This is a simplified implementation
     // In production, you might check subscription status, payment history, etc.
-    
+
     const memberCount = project.members.length;
-    
+
     if (memberCount > 10) {
       return 'enterprise';
     } else if (memberCount > 2) {
       return 'pro';
     }
-    
+
     return 'free';
   }
 
@@ -189,13 +193,13 @@ export class QuotaChecker {
   ): Promise<void> {
     try {
       const updates: any = {};
-      
+
       if (type === 'monthly' || type === 'both') {
         updates['usage.currentMonth.requests'] = 0;
         updates['usage.currentMonth.tokens'] = 0;
         updates['usage.currentMonth.cost'] = 0;
       }
-      
+
       if (type === 'daily' || type === 'both') {
         updates['usage.currentDay.requests'] = 0;
         updates['usage.currentDay.tokens'] = 0;
@@ -203,7 +207,7 @@ export class QuotaChecker {
       }
 
       await projectRepository.updateProject(projectId, { usage: updates } as any);
-      
+
       logger.info('Quota reset', { projectId, type });
     } catch (error) {
       logger.error('Failed to reset quota:', error);

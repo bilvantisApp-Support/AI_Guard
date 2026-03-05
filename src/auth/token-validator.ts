@@ -4,6 +4,7 @@ import { tokenRepository } from '../database/repositories/token.repository';
 import { IUser } from '../database/models/user.model';
 import { IPersonalAccessToken } from '../database/models/token.model';
 import { logger } from '../utils/logger';
+import { captchaService } from '../services/captcha/captcha.service';
 
 export interface AuthResult {
   user: IUser;
@@ -21,7 +22,7 @@ export class TokenValidator {
     return authHeader.substring(this.BEARER_PREFIX.length);
   }
 
-  public static async validateFirebaseToken(token: string): Promise<AuthResult | null> {
+  public static async validateFirebaseToken(token: string, captchaToken?: string): Promise<AuthResult | null> {
     try {
       const decodedToken = await firebaseAdmin.verifyIdToken(token);
       if (!decodedToken) {
@@ -30,21 +31,40 @@ export class TokenValidator {
 
       // Import userRepository here to avoid circular dependency
       const { userRepository } = await import('../database/repositories/user.repository');
-      
+
       // Find or create user based on Firebase UID
       let user = await userRepository.findByFirebaseUid(decodedToken.uid);
-      
+
+
       if (!user) {
+
+        //Check Captcha Token
+        if (typeof captchaToken !== 'string') {
+          logger.error("Invalid captcha token");
+          return null;
+        }
+
+        const validCaptchaToken = await captchaService.verifyTurnstileToken(captchaToken);
+        if (!validCaptchaToken) {
+          logger.warn("Captcha token missing for new user");
+          return null;
+        }
+
         // Create new user from Firebase data
         const firebaseUser = await firebaseAdmin.getUser(decodedToken.uid);
         if (!firebaseUser) {
           return null;
         }
 
+        //Count the number of users
+        const existingUsersCount = await userRepository.countUsers();
+        const role = existingUsersCount == 0 ? 'owner' : 'member';
+
         user = await userRepository.createUser({
           firebaseUid: decodedToken.uid,
           email: firebaseUser.email || decodedToken.email || '',
           name: firebaseUser.displayName || decodedToken.name || 'Unknown User',
+          role,
           status: 'active',
         });
       }
@@ -70,17 +90,17 @@ export class TokenValidator {
         logger.debug('Invalid PAT format');
         return null;
       }
-      
+
       // Find token by identifier
       const result = await tokenRepository.findByIdentifierWithUser(parsed.identifier);
-      
+
       if (!result) {
         logger.debug('PAT not found by identifier');
         return null;
       }
 
       const { token: patToken, user } = result;
-      
+
       // Compare the full token with stored hash
       const isValid = await this.compareToken(token, patToken.tokenHash);
       if (!isValid) {
@@ -108,7 +128,7 @@ export class TokenValidator {
     }
   }
 
-  public static async validateToken(authHeader: string | undefined): Promise<AuthResult | null> {
+  public static async validateToken(authHeader: string | undefined, captchaToken?: string): Promise<AuthResult | null> {
     const token = this.extractToken(authHeader);
     if (!token) {
       return null;
@@ -121,8 +141,8 @@ export class TokenValidator {
         return patResult;
       }
     }
-    
-    const firebaseResult = await this.validateFirebaseToken(token);
+
+    const firebaseResult = await this.validateFirebaseToken(token, captchaToken);
     if (firebaseResult) {
       return firebaseResult;
     }
@@ -145,21 +165,21 @@ export class TokenValidator {
     const identifier = crypto.randomBytes(8).toString('hex'); // 16 char identifier
     const secret = crypto.randomBytes(24).toString('base64url'); // 32 char secret
     const fullToken = `pat_${identifier}_${secret}`;
-    
+
     return {
       fullToken,
       identifier: `pat_${identifier}`,
       secret
     };
   }
-  
+
   public static parseToken(token: string): { identifier: string; secret: string } | null {
     // Parse token format: pat_<identifier>_<secret>
     const match = token.match(/^(pat_[a-f0-9]{16})_(.+)$/);
     if (!match) {
       return null;
     }
-    
+
     return {
       identifier: match[1],
       secret: match[2]

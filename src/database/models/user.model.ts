@@ -5,6 +5,7 @@ export interface IUser extends Document {
   firebaseUid?: string;
   email: string;
   name: string;
+  role: 'owner' | 'admin' | 'member';
   status: 'active' | 'suspended' | 'deleted';
   defaultProject?: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -30,6 +31,11 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: true,
       trim: true,
+    },
+    role: {
+      type: String,
+      enum: ['owner', 'admin', 'member'],
+      default: 'member',
     },
     status: {
       type: String,

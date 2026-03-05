@@ -28,6 +28,10 @@ export class RateLimiter {
     enterprise: { windowMs: 60000, maxRequests: 1000 },
   };
 
+  public getDefaults(): TierRateLimits {
+    return { ...this.defaultLimits }
+  }
+
   constructor() {
     this.initializeRedis();
   }
@@ -59,7 +63,7 @@ export class RateLimiter {
   public createMiddleware(defaultConfig?: RateLimitConfig) {
     return async (ctx: Context, next: Next) => {
       const config = this.getConfigForRequest(ctx, defaultConfig);
-      
+
       if (config.skip && config.skip(ctx)) {
         await next();
         return;
@@ -75,7 +79,7 @@ export class RateLimiter {
 
       if (limit.exceeded) {
         ctx.set('Retry-After', String(Math.ceil((limit.resetAt - Date.now()) / 1000)));
-        
+
         if (config.handler) {
           config.handler(ctx);
         } else {
@@ -101,7 +105,7 @@ export class RateLimiter {
   private getConfigForRequest(ctx: Context, defaultConfig?: RateLimitConfig): RateLimitConfig {
     const auth = ctx.state.auth;
     const project = auth?.project as IProject | undefined;
-    
+
     // Check for project-specific rate limit override
     if (project?.settings?.rateLimitOverride) {
       return {
@@ -188,13 +192,13 @@ export class RateLimiter {
 
       // Remove old entries
       pipeline.zremrangebyscore(key, '-inf', now - window);
-      
+
       // Add current request
       pipeline.zadd(key, now, `${now}-${Math.random()}`);
-      
+
       // Count requests in window
       pipeline.zcount(key, now - window, '+inf');
-      
+
       // Set expiry
       pipeline.expire(key, Math.ceil(window / 1000));
 
@@ -234,7 +238,7 @@ export class RateLimiter {
     }
 
     const entry = this.inMemoryStore.get(key);
-    
+
     if (!entry || entry.resetAt < now) {
       // New window
       const resetAt = now + window;
