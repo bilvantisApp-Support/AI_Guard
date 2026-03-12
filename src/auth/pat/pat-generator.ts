@@ -30,7 +30,7 @@ export class PatGenerator {
       const tokenHash = await TokenValidator.hashToken(fullToken);
       
       // Calculate expiration date if specified
-      const expiresAt = options.expiresInDays
+      const expiresAt = typeof options.expiresInDays === 'number'
         ? new Date(Date.now() + options.expiresInDays * 24 * 60 * 60 * 1000)
         : undefined;
 

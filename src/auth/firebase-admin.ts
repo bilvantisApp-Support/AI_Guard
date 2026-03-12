@@ -76,6 +76,21 @@ export class FirebaseAdmin {
     }
   }
 
+  public async getUserByEmail(email: string): Promise<admin.auth.UserRecord | null> {
+    if (!this.initialized) {
+      logger.warn('Firebase Admin SDK not initialized');
+      return null;
+    }
+
+    try {
+      const userRecord = await admin.auth().getUserByEmail(email);
+      return userRecord;
+    } catch (error) {
+      logger.error('Failed to get Firebase user by email:', error);
+      return null;
+    }
+  }
+
   public async createCustomToken(uid: string, claims?: object): Promise<string | null> {
     if (!this.initialized) {
       logger.warn('Firebase Admin SDK not initialized');
@@ -107,6 +122,19 @@ export class FirebaseAdmin {
     }
   }
 
+  public async updateUser(uid: string): Promise<admin.auth.UserRecord | null> {
+    if (!this.initialized) {
+      logger.warn("Firebase Admin SDK not initialized");
+      return null;
+    }
+    try {
+      const userRecord = await admin.auth().updateUser(uid, {disabled: true});
+      return userRecord;
+    } catch (error) {
+      logger.error("Failed to update Firebase user:", error);
+      return null;
+    }
+  }
 
   public isInitialized(): boolean {
     return this.initialized;

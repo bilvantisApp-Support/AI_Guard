@@ -8,7 +8,7 @@ import { ProxyError, ProxyErrorType } from '../../types/proxy';
 import { projectRepository } from '../../database/repositories';
 import { providerSnippetRepository } from '../../database/repositories/provider-snippet.repository';
 import { patCreatedTemplate } from '../../services/mail/templates/pat-created.template';
-import { firebaseAdmin } from '../../auth';
+import {  firebaseAdmin } from '../../auth';
 import { forgotPasswordTemplate } from '../../services/mail/templates/forgot-password.template';
 import { brevoService } from '../../services/mail/mail.service';
 
@@ -134,6 +134,12 @@ export class UsersController {
       }
       const userId = ctx.state.auth.user._id;
 
+      const user = await userRepository.findById(userId);
+      if (user?.firebaseUid) {
+        await firebaseAdmin.updateUser(user.firebaseUid);
+        console.log(`Firebase user with UID ${user.firebaseUid} has been disabled.`);
+      } 
+
       // Soft delete the user
       const deletedUser = await userRepository.deleteUser(userId);
 
@@ -196,7 +202,7 @@ export class UsersController {
       const isMember = await projectRepository.isMember(projectId, authUserId);
 
       if (!isMember) {
-        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Requesting user is not a member of the project');
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'User not a member of the project');
       }
 
       const memberRole = await projectRepository.getMemberRole(projectId, authUserId);

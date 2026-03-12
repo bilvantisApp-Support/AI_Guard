@@ -2,6 +2,7 @@ import { Context } from "koa";
 import { otpService } from "../../services/OTP/otp.service";
 import { ProxyError, ProxyErrorType } from "../../types/proxy";
 import { logger } from "../../utils/logger";
+import { getAuth } from "firebase-admin/auth";
 
 export class OTPController {
 
@@ -30,7 +31,19 @@ export class OTPController {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "name is required");
             }
 
-            await otpService.sendOTP(email,name);
+            // Check if user with the email already exists
+            try {
+                const user = await getAuth().getUserByEmail(email);
+                if (user) {
+                    throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Email is already Exists");
+                }
+            } catch (error: any) {
+                if(error.code !== 'auth/user-not-found'){
+                    throw error;
+                }
+            }
+
+            await otpService.sendOTP(email, name);
             ctx.body = {
                 success: true,
                 message: "OTP sent successfully"
@@ -46,7 +59,7 @@ export class OTPController {
     */
     static async verifyOTP(ctx: Context): Promise<void> {
         try {
-            const { email, otp } = ctx.request.body as { email: string; otp: string | number ; };
+            const { email, otp } = ctx.request.body as { email: string; otp: string | number; };
 
             if (typeof email !== 'string' || (typeof otp !== 'string' && typeof otp !== 'number')) {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid input types");

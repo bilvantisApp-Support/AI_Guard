@@ -32,6 +32,11 @@ export class TeamsController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Description is too long");
       }
 
+      const existingTeam = await teamRepository.findByName(name.trim());
+      if (existingTeam) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 409, 'Team name already exists');
+      }
+
       const team = await teamRepository.createTeam({
         name: name.trim(),
         description,
