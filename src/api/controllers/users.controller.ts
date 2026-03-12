@@ -136,8 +136,7 @@ export class UsersController {
 
       const user = await userRepository.findById(userId);
       if (user?.firebaseUid) {
-        await firebaseAdmin.updateUser(user.firebaseUid);
-        console.log(`Firebase user with UID ${user.firebaseUid} has been disabled.`);
+        await firebaseAdmin.disableUser(user.firebaseUid);
       } 
 
       // Soft delete the user
