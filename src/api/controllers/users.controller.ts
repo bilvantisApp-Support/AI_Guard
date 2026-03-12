@@ -8,7 +8,7 @@ import { ProxyError, ProxyErrorType } from '../../types/proxy';
 import { projectRepository } from '../../database/repositories';
 import { providerSnippetRepository } from '../../database/repositories/provider-snippet.repository';
 import { patCreatedTemplate } from '../../services/mail/templates/pat-created.template';
-import {  firebaseAdmin } from '../../auth';
+import { firebaseAdmin } from '../../auth';
 import { forgotPasswordTemplate } from '../../services/mail/templates/forgot-password.template';
 import { brevoService } from '../../services/mail/mail.service';
 
@@ -137,7 +137,7 @@ export class UsersController {
       const user = await userRepository.findById(userId);
       if (user?.firebaseUid) {
         await firebaseAdmin.disableUser(user.firebaseUid);
-      } 
+      }
 
       // Soft delete the user
       const deletedUser = await userRepository.deleteUser(userId);
@@ -186,6 +186,12 @@ export class UsersController {
 
       if (!scopes || !Array.isArray(scopes) || scopes.length === 0) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'At least one scope is required');
+      }
+
+      // Validate provider
+      const validProviders = ['openai', 'anthropic', 'gemini'];
+      if (!validProviders.includes(llmProvider.toLowerCase())) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Invalid provider');
       }
 
       if (!llmProvider || typeof llmProvider !== 'string') {
@@ -265,6 +271,12 @@ export class UsersController {
         userId: tokenRecord.userId,
         expiresAt: tokenRecord.expiresAt,
         createdAt: tokenRecord.createdAt,
+        snippets: {
+          curl: snippets.curl,
+          node: snippets.node,
+          python: snippets.python,
+          java: snippets.java
+        }
       };
     } catch (error) {
       logger.error('Failed to create token:', error);
