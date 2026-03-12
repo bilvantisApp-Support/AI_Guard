@@ -122,7 +122,7 @@ export class FirebaseAdmin {
     }
   }
 
-  public async updateUser(uid: string): Promise<admin.auth.UserRecord | null> {
+  public async disableUser(uid: string): Promise<admin.auth.UserRecord | null> {
     if (!this.initialized) {
       logger.warn("Firebase Admin SDK not initialized");
       return null;
