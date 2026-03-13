@@ -147,6 +147,7 @@ export class AnalyticsRepository {
     }));
 
     const projectsRaw = await UsageRecord.aggregate([
+      { $match: match },
       { $group: { _id: '$projectId' } }
     ]);
 

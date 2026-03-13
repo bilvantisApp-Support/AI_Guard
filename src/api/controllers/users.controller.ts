@@ -188,14 +188,14 @@ export class UsersController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'At least one scope is required');
       }
 
+      if (!llmProvider || typeof llmProvider !== 'string') {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'LLM provider is required');
+      }
+
       // Validate provider
       const validProviders = ['openai', 'anthropic', 'gemini'];
       if (!validProviders.includes(llmProvider.toLowerCase())) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Invalid provider');
-      }
-
-      if (!llmProvider || typeof llmProvider !== 'string') {
-        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'LLM provider is required');
       }
 
       // Validate scopes
@@ -232,6 +232,7 @@ export class UsersController {
       // Generate token
       const { token, tokenRecord } = await PatGenerator.generateToken({
         userId,
+        createdBy: authUserId,
         projectId,
         name,
         scopes,
@@ -363,12 +364,38 @@ export class UsersController {
 
       const { token, tokenRecord } = result;
 
+      const snippets = await providerSnippetRepository.getProviderSnippet(tokenRecord.llmProvider);
+      if (!snippets) {
+        throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, 'Provider snippets not found');
+      }
+
+      const user = await userRepository.findById(tokenRecord.userId);
+      if (!user) {
+        throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, 'User not found');
+      }
+      const SENT_MAIL = true;
+      if (SENT_MAIL) {
+        const html = patCreatedTemplate(user.name, token, snippets);
+        await brevoService.sendMail(
+          user.email,
+          "Your Rotated AI Guard PAT Token",
+          html
+        );
+      }
+
       ctx.body = {
         id: tokenRecord._id,
         name: tokenRecord.name,
         token, // New token - only returned once
         scopes: tokenRecord.scopes,
         projectId: tokenRecord.projectId,
+        llmProvider: tokenRecord.llmProvider,
+        snippets: {
+          curl: snippets.curl,
+          node: snippets.node,
+          python: snippets.python,
+          java: snippets.java
+        },
         expiresAt: tokenRecord.expiresAt,
         createdAt: tokenRecord.createdAt,
         rotatedFrom: tokenId,

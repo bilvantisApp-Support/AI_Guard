@@ -34,7 +34,7 @@ export class OTPController {
             // Check if user with the email already exists
             const user = await userRepository.findByEmail(email);
             if (user) {
-                throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Email is already Exists");
+                throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Email already Exists");
             }
 
             await otpService.sendOTP(email, name);

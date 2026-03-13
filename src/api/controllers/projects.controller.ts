@@ -9,7 +9,7 @@ import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
 import mongoose from 'mongoose';
 import { rateLimiter } from '../../interceptors';
-import { validateApiKeyRepository } from '../../database/repositories/validateapikey.repository';
+import { validateApiKeyService } from '../../services/validatepikeyservice.repository';
 
 export class ProjectsController {
   /**
@@ -36,10 +36,14 @@ export class ProjectsController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Description is too long")
       }
 
-      const existingProject = await projectRepository.findByName(name.trim());
-
-      if (existingProject) {
-        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 409, 'Project name already exists');
+      try {
+        const existingProject = await projectRepository.findByName(name.trim());
+        if (existingProject) {
+          throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 409, 'Project name already exists');
+        }
+      } catch (error) {
+        logger.error('Project name already exists:', error);
+        throw error;
       }
 
       const project = await projectRepository.createProject({
@@ -306,13 +310,13 @@ export class ProjectsController {
 
       switch (provider.toLowerCase()) {
         case 'openai':
-          await validateApiKeyRepository.validateOpenAIKey(apiKey);
+          await validateApiKeyService.validateOpenAIKey(apiKey);
           break;
         case 'anthropic':
-          await validateApiKeyRepository.validateAnthropicKey(apiKey);
+          await validateApiKeyService.validateAnthropicKey(apiKey);
           break;
         case 'gemini':
-          await validateApiKeyRepository.validateGeminiKey(apiKey);
+          await validateApiKeyService.validateGeminiKey(apiKey);
           break;
         default:
           throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Unsupported provider");

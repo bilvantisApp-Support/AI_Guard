@@ -57,7 +57,7 @@ export class FirebaseAdmin {
       return decodedToken;
     } catch (error) {
       logger.error('Failed to verify Firebase ID token:', error);
-      return null;
+      throw new Error('Failed to verify Firebase ID token');
     }
   }
 
@@ -72,7 +72,7 @@ export class FirebaseAdmin {
       return userRecord;
     } catch (error) {
       logger.error('Failed to get Firebase user:', error);
-      return null;
+      throw new Error('Failed to get Firebase user');
     }
   }
 
@@ -87,7 +87,7 @@ export class FirebaseAdmin {
       return customToken;
     } catch (error) {
       logger.error('Failed to create custom token:', error);
-      return null;
+      throw new Error('Failed to create custom token');
     }
   }
 
@@ -103,7 +103,7 @@ export class FirebaseAdmin {
       return link;
     } catch (error) {
       logger.error("Failed to generate password reset link:", error);
-      return null;
+      throw new Error("Failed to generate password reset link");
     }
   }
 
@@ -113,11 +113,11 @@ export class FirebaseAdmin {
       return null;
     }
     try {
-      const userRecord = await admin.auth().updateUser(uid, {disabled: true});
+      const userRecord = await admin.auth().updateUser(uid, { disabled: true });
       return userRecord;
     } catch (error) {
       logger.error("Failed to update Firebase user:", error);
-      return null;
+      throw new Error("Failed to disable user");
     }
   }
 
