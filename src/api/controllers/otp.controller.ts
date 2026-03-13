@@ -2,7 +2,7 @@ import { Context } from "koa";
 import { otpService } from "../../services/OTP/otp.service";
 import { ProxyError, ProxyErrorType } from "../../types/proxy";
 import { logger } from "../../utils/logger";
-import { getAuth } from "firebase-admin/auth";
+import { userRepository } from "../../database/repositories";
 
 export class OTPController {
 
@@ -32,15 +32,9 @@ export class OTPController {
             }
 
             // Check if user with the email already exists
-            try {
-                const user = await getAuth().getUserByEmail(email);
-                if (user) {
-                    throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Email is already Exists");
-                }
-            } catch (error: any) {
-                if(error.code !== 'auth/user-not-found'){
-                    throw error;
-                }
+            const user = await userRepository.findByEmail(email);
+            if (user) {
+                throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Email is already Exists");
             }
 
             await otpService.sendOTP(email, name);
