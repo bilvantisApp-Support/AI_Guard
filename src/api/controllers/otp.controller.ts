@@ -2,6 +2,7 @@ import { Context } from "koa";
 import { otpService } from "../../services/OTP/otp.service";
 import { ProxyError, ProxyErrorType } from "../../types/proxy";
 import { logger } from "../../utils/logger";
+import { userRepository } from "../../database/repositories";
 
 export class OTPController {
 
@@ -30,7 +31,13 @@ export class OTPController {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "name is required");
             }
 
-            await otpService.sendOTP(email,name);
+            // Check if user with the email already exists
+            const user = await userRepository.findByEmail(email);
+            if (user) {
+                throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Email already Exists");
+            }
+
+            await otpService.sendOTP(email, name);
             ctx.body = {
                 success: true,
                 message: "OTP sent successfully"
@@ -46,7 +53,7 @@ export class OTPController {
     */
     static async verifyOTP(ctx: Context): Promise<void> {
         try {
-            const { email, otp } = ctx.request.body as { email: string; otp: string | number ; };
+            const { email, otp } = ctx.request.body as { email: string; otp: string | number; };
 
             if (typeof email !== 'string' || (typeof otp !== 'string' && typeof otp !== 'number')) {
                 throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Invalid input types");

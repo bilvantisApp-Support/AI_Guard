@@ -53,6 +53,10 @@ export class TeamRepository {
     return await Team.findById(teamId).exec();
   }
 
+  async findByName(name: string): Promise<ITeam | null> {
+    return await Team.findOne({ name: name.trim() }).exec();
+  }
+
   async findByIdWithMembers(teamId: string | mongoose.Types.ObjectId): Promise<ITeam | null> {
     return await Team.findById(teamId)
       .populate({

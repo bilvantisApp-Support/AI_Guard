@@ -9,6 +9,7 @@ import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
 import mongoose from 'mongoose';
 import { rateLimiter } from '../../interceptors';
+import { validateApiKeyService } from '../../services/validatepikeyservice.repository';
 
 export class ProjectsController {
   /**
@@ -23,6 +24,7 @@ export class ProjectsController {
       if (!name || !name.trim()) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Project name is required');
       }
+
       if (name.length < 4) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Name must be at least 4 characters long");
       }
@@ -32,6 +34,16 @@ export class ProjectsController {
 
       if (description.length > 200) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Description is too long")
+      }
+
+      try {
+        const existingProject = await projectRepository.findByName(name.trim());
+        if (existingProject) {
+          throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 409, 'Project name already exists');
+        }
+      } catch (error) {
+        logger.error('Project name already exists:', error);
+        throw error;
       }
 
       const project = await projectRepository.createProject({
@@ -71,8 +83,20 @@ export class ProjectsController {
           ownerId: project.ownerId,
           teamId: project.teamIds,
           memberCount: project.members.length,
+          members: project.members.map(member => {
+            if (typeof member.userId === 'object' && member.userId !== null && 'name' in member.userId) {
+              return {
+                memberUserId: member.userId._id,
+                name: member.userId.name,
+              };
+            }
+            return {
+              memberUserId: member.userId,
+              name: undefined,
+            };
+          }),
           apiKeyCount: project.apiKeys.length,
-          role: project.members.find(m => m.userId.toString() === userId.toString())?.role,
+          role: project.members.find(m => m.userId._id.toString() === userId.toString())?.role,
           createdAt: project.createdAt,
           updatedAt: project.updatedAt,
         })),
@@ -282,6 +306,20 @@ export class ProjectsController {
       const validProviders = ['openai', 'anthropic', 'gemini'];
       if (!validProviders.includes(provider.toLowerCase())) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Invalid provider');
+      }
+
+      switch (provider.toLowerCase()) {
+        case 'openai':
+          await validateApiKeyService.validateOpenAIKey(apiKey);
+          break;
+        case 'anthropic':
+          await validateApiKeyService.validateAnthropicKey(apiKey);
+          break;
+        case 'gemini':
+          await validateApiKeyService.validateGeminiKey(apiKey);
+          break;
+        default:
+          throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Unsupported provider");
       }
 
       // Encrypt the API key
