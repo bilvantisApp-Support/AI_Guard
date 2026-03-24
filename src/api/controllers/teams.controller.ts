@@ -8,6 +8,7 @@ import { quotaChecker } from '../../interceptors/request/quota-checker';
 import { rateLimiter } from '../../interceptors';
 import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
+import { User } from '../../database/models/user.model';
 
 export class TeamsController {
   /**
@@ -30,6 +31,16 @@ export class TeamsController {
       }
       if (description.length > 200) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, "Description is too long");
+      }
+
+      try {
+        const existingTeam = await teamRepository.findByName(name.trim());
+        if (existingTeam) {
+          throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 409, 'Team name already exists');
+        }
+      } catch (error) {
+        logger.error('Team name already exists:', error);
+        throw error;
       }
 
       const team = await teamRepository.createTeam({
@@ -62,6 +73,10 @@ export class TeamsController {
       const limit = parseInt(ctx.query.limit as string) || 10;
       const { teams, total } = await teamRepository.findByMember(userId, { page, limit });
 
+      const memberIds = teams.map(t => t.members).flat().map(member => member.userId.toString());
+      const memberDocs = memberIds.length ? await User.find({ _id: { $in: memberIds } }).select({ _id: 1, name: 1 }).lean() : [];
+      const memberIdToName = new Map(memberDocs.map((u) => [u._id.toString(), u.name]));
+
       ctx.body = {
         teams: teams.map(team => ({
           id: team._id,
@@ -71,6 +86,10 @@ export class TeamsController {
           memberCount: team.members.length,
           projectCount: team.projectCount,
           role: team.members.find((m) => m.userId.toString() === userId.toString())?.role,
+          members: (team.members || []).map((member: any) => ({
+            memberUserId: member.userId,
+            name: memberIdToName.get(member.userId?.toString()) || undefined,
+          })),
           createdAt: team.createdAt,
           updatedAt: team.updatedAt,
         })),

@@ -52,6 +52,10 @@ export class ProjectRepository {
     return await Project.findById(projectId).exec();
   }
 
+  async findByName(name: string): Promise<IProject | null> {
+    return await Project.findOne({ name: name.trim() }).exec();
+  }
+
   async findByIdWithMembers(projectId: String | mongoose.Types.ObjectId): Promise<IProject | null> {
     return await Project.findById(projectId).populate({
       path: 'members.userId',
@@ -71,7 +75,7 @@ export class ProjectRepository {
     const skip = (page - 1) * limit;
 
     const [projects, total] = await Promise.all([
-      Project.find(query).skip(skip).limit(limit).exec(),
+      Project.find(query).populate({ path: 'members.userId', select: 'name' }).skip(skip).limit(limit).exec(),
       Project.countDocuments(query).exec()
     ]);
 
