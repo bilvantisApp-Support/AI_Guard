@@ -97,8 +97,13 @@ export class AnalyticsRepository {
       gemini: '#4285F4'
     };
 
+    const providerMatch: any = {};
+    if (project && project !== 'all') {
+      providerMatch.projectId = new mongoose.Types.ObjectId(project);
+    }
+
     const providersRaw = await UsageRecord.aggregate([
-      { $match: match },
+      { $match: providerMatch },
       {
         $group: {
           _id: '$provider',
@@ -142,7 +147,7 @@ export class AnalyticsRepository {
     }));
 
     const projectsRaw = await UsageRecord.aggregate([
-      { $match: { timestamp: { $gte: start } } },
+      { $match: match },
       { $group: { _id: '$projectId' } }
     ]);
 

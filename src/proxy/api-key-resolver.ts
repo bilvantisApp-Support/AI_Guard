@@ -167,7 +167,7 @@ export class ApiKeyResolver {
         header: 'X-API-Key',
       },
       gemini: {
-        header: 'X-API-Key',
+        header: 'x-goog-api-key',
       },
     };
 

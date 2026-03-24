@@ -134,6 +134,11 @@ export class UsersController {
       }
       const userId = ctx.state.auth.user._id;
 
+      const user = await userRepository.findById(userId);
+      if (user?.firebaseUid) {
+        await firebaseAdmin.disableUser(user.firebaseUid);
+      }
+
       // Soft delete the user
       const deletedUser = await userRepository.deleteUser(userId);
 
@@ -187,6 +192,12 @@ export class UsersController {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'LLM provider is required');
       }
 
+      // Validate provider
+      const validProviders = ['openai', 'anthropic', 'gemini'];
+      if (!validProviders.includes(llmProvider.toLowerCase())) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Invalid provider');
+      }
+
       // Validate scopes
       if (!ScopeValidator.validateScopes(scopes)) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 400, 'Invalid scopes provided');
@@ -196,7 +207,7 @@ export class UsersController {
       const isMember = await projectRepository.isMember(projectId, authUserId);
 
       if (!isMember) {
-        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'Requesting user is not a member of the project');
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'User not a member of the project');
       }
 
       const memberRole = await projectRepository.getMemberRole(projectId, authUserId);
@@ -221,6 +232,7 @@ export class UsersController {
       // Generate token
       const { token, tokenRecord } = await PatGenerator.generateToken({
         userId,
+        createdBy: authUserId,
         projectId,
         name,
         scopes,
@@ -260,6 +272,12 @@ export class UsersController {
         userId: tokenRecord.userId,
         expiresAt: tokenRecord.expiresAt,
         createdAt: tokenRecord.createdAt,
+        snippets: {
+          curl: snippets.curl,
+          node: snippets.node,
+          python: snippets.python,
+          java: snippets.java
+        }
       };
     } catch (error) {
       logger.error('Failed to create token:', error);
@@ -346,12 +364,38 @@ export class UsersController {
 
       const { token, tokenRecord } = result;
 
+      const snippets = await providerSnippetRepository.getProviderSnippet(tokenRecord.llmProvider);
+      if (!snippets) {
+        throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, 'Provider snippets not found');
+      }
+
+      const user = await userRepository.findById(tokenRecord.userId);
+      if (!user) {
+        throw new ProxyError(ProxyErrorType.NOT_FOUND_ERROR, 404, 'User not found');
+      }
+      const SENT_MAIL = true;
+      if (SENT_MAIL) {
+        const html = patCreatedTemplate(user.name, token, snippets);
+        await brevoService.sendMail(
+          user.email,
+          "Your Rotated AI Guard PAT Token",
+          html
+        );
+      }
+
       ctx.body = {
         id: tokenRecord._id,
         name: tokenRecord.name,
         token, // New token - only returned once
         scopes: tokenRecord.scopes,
         projectId: tokenRecord.projectId,
+        llmProvider: tokenRecord.llmProvider,
+        snippets: {
+          curl: snippets.curl,
+          node: snippets.node,
+          python: snippets.python,
+          java: snippets.java
+        },
         expiresAt: tokenRecord.expiresAt,
         createdAt: tokenRecord.createdAt,
         rotatedFrom: tokenId,
