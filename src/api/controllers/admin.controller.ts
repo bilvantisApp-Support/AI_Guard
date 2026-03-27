@@ -9,6 +9,8 @@ import { responseCache } from '../../interceptors/response/response-cache';
 import { dbConnection } from '../../database/connection';
 import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
+import { firebaseAdmin } from '../../auth';
+import { tokenRepository } from '../../database/repositories';
 
 export class AdminController {
   /**
@@ -50,7 +52,7 @@ export class AdminController {
         filters.status = status;
       }
 
-      const { users, total } = await userRepository.findActiveUsers(filters, { page, limit });
+      const { users, total } = await userRepository.findUsers(filters, { page, limit });
 
       ctx.body = {
         users: users.map(user => ({
@@ -114,6 +116,42 @@ export class AdminController {
       };
     } catch (error) {
       logger.error('Failed to update user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete user
+   * DELETE /_api/admin/users/:id
+   */
+  static async deleteUser(ctx: Context): Promise<void> {
+    try {
+      const userId = ctx.params.id;
+
+      const user = await userRepository.findById(userId);
+      if (user?.firebaseUid) {
+        await firebaseAdmin.disableUser(user.firebaseUid);
+      }
+
+      // Soft delete the user
+      const deletedUser = await userRepository.deleteUser(userId);
+
+      if (!deletedUser) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 404, 'User not found');
+      }
+
+      // Revoke all user's tokens
+      const userTokens = await tokenRepository.findByUserId(userId);
+      await Promise.all(
+        userTokens.map(token => tokenRepository.revokeToken(token._id))
+      );
+
+      ctx.body = {
+        message: 'User deleted successfully',
+        deletedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      logger.error('Failed to delete user:', error);
       throw error;
     }
   }

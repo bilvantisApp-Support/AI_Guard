@@ -68,17 +68,21 @@ export class UserRepository {
     ).exec();
   }
 
-  async findActiveUsers(
+  async findUsers(
     filters: {
       email?: string;
       name?: string;
+      status?: string;
     } = {},
     pagination: {
       page?: number;
       limit?: number;
     } = {}
   ): Promise<{ users: IUser[]; total: number }> {
-    const query: any = { status: 'active' };
+    const query: any = { status: { $in: ['active', 'suspended'] } };
+    if (filters.status) {
+      query.status = filters.status;
+    }
 
     if (filters.email) {
       query.email = { $regex: filters.email, $options: 'i' };

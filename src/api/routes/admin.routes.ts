@@ -14,6 +14,7 @@ router.get('/system/health', AdminController.getSystemHealth);
 // User management
 router.get('/users', AdminController.listUsers);
 router.put('/users/:id', AdminController.updateUser);
+router.delete('/users/:id', AdminController.deleteUser);
 router.post('/users/:id/reset-limits', AdminController.resetUserLimits);
 
 // Audit logs
