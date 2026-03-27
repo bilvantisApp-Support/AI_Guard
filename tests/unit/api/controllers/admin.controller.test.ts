@@ -41,7 +41,7 @@ describe("AdminController", () => {
                     lastLoginAt: new Date(),
                 },
             ];
-            (userRepository.findActiveUsers as jest.Mock).mockResolvedValue({
+            (userRepository.findUsers as jest.Mock).mockResolvedValue({
                 users: mockUsers,
                 total: 2,
             });
@@ -50,7 +50,7 @@ describe("AdminController", () => {
                 limit: "10",
             };
             await AdminController.listUsers(ctx);
-            expect(userRepository.findActiveUsers).toHaveBeenCalledWith(
+            expect(userRepository.findUsers).toHaveBeenCalledWith(
                 {},
                 { page: 1, limit: 10 }
             );
@@ -85,7 +85,7 @@ describe("AdminController", () => {
         });
 
         it("should apply status filter", async () => {
-            (userRepository.findActiveUsers as jest.Mock).mockResolvedValue({
+            (userRepository.findUsers as jest.Mock).mockResolvedValue({
                 users: [],
                 total: 0,
             });
@@ -93,19 +93,19 @@ describe("AdminController", () => {
                 status: "active",
             };
             await AdminController.listUsers(ctx);
-            expect(userRepository.findActiveUsers).toHaveBeenCalledWith(
+            expect(userRepository.findUsers).toHaveBeenCalledWith(
                 { status: "active" },
                 { page: 1, limit: 20 }
             );
         });
 
         it("should use default pagination values", async () => {
-            (userRepository.findActiveUsers as jest.Mock).mockResolvedValue({
+            (userRepository.findUsers as jest.Mock).mockResolvedValue({
                 users: [],
                 total: 0,
             });
             await AdminController.listUsers(ctx);
-            expect(userRepository.findActiveUsers).toHaveBeenCalledWith(
+            expect(userRepository.findUsers).toHaveBeenCalledWith(
                 {},
                 { page: 1, limit: 20 }
             );

@@ -61,7 +61,7 @@ export class TeamRepository {
     return await Team.findById(teamId)
       .populate({
         path: 'members.userId',
-        select: 'name email',
+        select: 'name email status',
       })
       .exec();
   }

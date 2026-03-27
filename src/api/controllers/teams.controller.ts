@@ -74,8 +74,8 @@ export class TeamsController {
       const { teams, total } = await teamRepository.findByMember(userId, { page, limit });
 
       const memberIds = teams.map(t => t.members).flat().map(member => member.userId.toString());
-      const memberDocs = memberIds.length ? await User.find({ _id: { $in: memberIds } }).select({ _id: 1, name: 1 }).lean() : [];
-      const memberIdToName = new Map(memberDocs.map((u) => [u._id.toString(), u.name]));
+      const memberDocs = memberIds.length ? await User.find({ _id: { $in: memberIds } }).select({ _id: 1, name: 1, status: 1 }).lean() : [];
+      const memberIdToData = new Map(memberDocs.map((u) => [u._id.toString(), { name: u.name, status: u.status }]));
 
       ctx.body = {
         teams: teams.map(team => ({
@@ -88,7 +88,8 @@ export class TeamsController {
           role: team.members.find((m) => m.userId.toString() === userId.toString())?.role,
           members: (team.members || []).map((member: any) => ({
             memberUserId: member.userId,
-            name: memberIdToName.get(member.userId?.toString()) || undefined,
+            name: memberIdToData.get(member.userId?.toString())?.name || undefined,
+            status: memberIdToData.get(member.userId?.toString())?.status,
           })),
           createdAt: team.createdAt,
           updatedAt: team.updatedAt,
@@ -134,7 +135,7 @@ export class TeamsController {
         description: team.description,
         ownerId: team.ownerId,
         members: team.members.map((member) => {
-          let memberUserId, name, email;
+          let memberUserId, name, email, status;
           if (
             typeof member.userId === 'object' &&
             member.userId !== null &&
@@ -144,16 +145,19 @@ export class TeamsController {
             memberUserId = member.userId._id as mongoose.Types.ObjectId;
             name = member.userId.name as string;
             email = member.userId.email as string;
+            status = 'status' in member.userId ? member.userId.status : undefined;
           } else {
             memberUserId = member.userId;
             name = undefined;
             email = undefined;
+            status = undefined;
           }
 
           return {
             memberUserId,
             name,
             email,
+            status,
             role: member.role,
             addedAt: member.addedAt,
           };

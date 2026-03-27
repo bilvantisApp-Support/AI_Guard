@@ -5,7 +5,7 @@ import { PatGenerator } from '../../auth/pat/pat-generator';
 import { ScopeValidator } from '../../auth/pat/pat-scopes';
 import { logger } from '../../utils/logger';
 import { ProxyError, ProxyErrorType } from '../../types/proxy';
-import { projectRepository } from '../../database/repositories';
+import { projectRepository, teamRepository } from '../../database/repositories';
 import { providerSnippetRepository } from '../../database/repositories/provider-snippet.repository';
 import { patCreatedTemplate } from '../../services/mail/templates/pat-created.template';
 import { firebaseAdmin } from '../../auth';
@@ -221,6 +221,15 @@ export class UsersController {
 
       if (!targetMember) {
         throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 403, 'User not a member of the project');
+      }
+
+      const project = await projectRepository.findById(projectId);
+      const isSameTeam = !!project?.teamIds?.length && (await Promise.all(
+        project.teamIds.map((teamId) => teamRepository.isMember(teamId, userId))
+      )).some(Boolean);
+
+      if (!isSameTeam) {
+        throw new ProxyError(ProxyErrorType.INVALID_REQUEST, 403, 'user and project must be associated with the same team.');
       }
 
       // Check name uniqueness

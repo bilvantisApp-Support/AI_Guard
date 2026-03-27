@@ -88,11 +88,13 @@ export class ProjectsController {
               return {
                 memberUserId: member.userId._id,
                 name: member.userId.name,
+                status: 'status' in member.userId ? member.userId.status : undefined,
               };
             }
             return {
               memberUserId: member.userId,
               name: undefined,
+              status: undefined,
             };
           }),
           apiKeyCount: project.apiKeys.length,
@@ -143,7 +145,7 @@ export class ProjectsController {
         ownerId: project.ownerId,
         teamId: project.teamIds,
         members: project.members.map(member => {
-          let memberUserId, name, email;
+          let memberUserId, name, email, status;
           if (
             typeof member.userId === 'object' &&
             member.userId !== null &&
@@ -153,16 +155,19 @@ export class ProjectsController {
             memberUserId = member.userId._id as mongoose.Types.ObjectId;
             name = member.userId.name as string;
             email = member.userId.email as string;
+            status = 'status' in member.userId ? member.userId.status : undefined;
           } else {
             memberUserId = member.userId;
             name = undefined;
             email = undefined;
+            status = undefined;
           }
 
           return {
             memberUserId,
             name,
             email,
+            status,
             role: member.role,
             addedAt: member.addedAt,
           };
